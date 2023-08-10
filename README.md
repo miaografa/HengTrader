@@ -4,6 +4,6 @@
 This is a trading program for crypto currencies.
 I build this program using huobi python API.(which is no recommended)
 
-Welcome anyone to join me, as this is a great learning opportunity. In the future, I will continue to work on improving this code system.
+Welcome anyone to join me, as this is a great learning opportunity. In the future, I will continue to work on improving this code system.However, first I need some time to write code comments and explanations.
 
 内容还在完善开发中。。。
