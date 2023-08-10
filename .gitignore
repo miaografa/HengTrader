@@ -1,0 +1,15 @@
+### Venv ###
+venv/
+
+### Build File ###
+.idea/
+build/
+dist/
+
+### Python ###
+__pycache__
+*.pyc
+privateconfig.py
+
+### Other ###
+.DS_Store
