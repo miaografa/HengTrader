@@ -21,7 +21,10 @@ Does such a simple project really need an introduction to the file structure?
   - trade_utils.py  - Utility functions for placing orders.(下单相关的工具函数)
 - [Research](#Research) - In the research section, I document my exploration process regarding cryptocurrency-related trading signals/strategies, primarily divided into two categories: (在research部分记录了我对于加密货币相关交易信号/策略的每次探索过程，主要分为两类：)
   1. signals(信号)
-  2. Strategies(策略)
+      - [Moving Average and Trend of Prices.](./Research/trend_strategy.ipynb)
+      - [Volatility and signal theta](./Research/mean_reversion.ipynb)
+  3. Strategies(策略)
+      - [Refining Signals Using Machine Learning](./Research/machine_learning)
 
 
 # Bot
