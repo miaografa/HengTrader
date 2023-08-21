@@ -32,8 +32,9 @@ class Account_Structure(object):
         print('balance_quote_currency:', self.balance_quote_currency)
 
 
-def create_order(account_id, trade_client, order_s:Order_Structure):
+def create_order(my_spot_account_s, trade_client, order_s:Order_Structure, price_dict):
     # todo 目前设置的都是按照Market 买入卖出
+    account_id = my_spot_account_s.id
     symbol = order_s.symbol
     amount = order_s.amount
     direction = order_s.direction
@@ -42,11 +43,15 @@ def create_order(account_id, trade_client, order_s:Order_Structure):
         order_id = trade_client.create_order(symbol=symbol, account_id=account_id, order_type=OrderType.BUY_MARKET,
                                           source=OrderSource.API, amount=amount, price=None)
         LogInfo.output("created buy order id : {id}".format(id=order_id))
+        # 更新持仓成本
+        my_spot_account_s.currency_info_df.loc[symbol, "bid_price"] = price_dict[symbol]['close'].values[-1]
 
     elif direction=='sell':
         order_id = trade_client.create_order(symbol=symbol, account_id=account_id, order_type=OrderType.SELL_MARKET,
                                              source=OrderSource.API, amount=amount, price=None)
         LogInfo.output("created sell order id : {id}".format(id=order_id))
+        # 更新持仓成本
+        my_spot_account_s.currency_info_df.loc[symbol, "bid_price"] = 0
 
     elif direction=='hold':
         order_id = None

@@ -6,6 +6,11 @@ venv/
 build/
 dist/
 
+### Data ###
+Research/data/
+
+### Research ### 
+
 ### Python ###
 __pycache__
 *.pyc

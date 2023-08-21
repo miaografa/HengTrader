@@ -10,12 +10,12 @@ from Bot.strategy_utils import calculate_position_value, np_round_floor
 from Bot.backtest import Backtest_trend_k
 
 
-
 class StrategyInterface(object):
-    def __init__(self, account:Account_Structure):
+    def __init__(self, account):
         self.account = account
+        pass
 
-    def get_order_list(self, data, target_position=1.):
+    def get_order_list(self, data, my_spot_account_s, target_position=1.):
         '''输入数据，得到交易订单'''
         pass
 
@@ -24,7 +24,7 @@ class StrategyInterface(object):
 
 class Strategy_Random(StrategyInterface):
     '''随机交易策略'''
-    def __init__(self, account, config_dict):
+    def __init__(self, account):
         super().__init__(account)
 
     def get_orders(self, data_df, target_position=1.):
@@ -59,8 +59,9 @@ class Strategy_Random(StrategyInterface):
 
 class Strategy_Test(StrategyInterface):
     '''随机交易策略'''
-    def __init__(self, account, config_dict):
+    def __init__(self, account):
         super().__init__(account)
+        pass
 
     def get_order(self, data_df, target_position=1.):
 
@@ -143,7 +144,7 @@ class Strategy_trend(StrategyInterface):
 
 class Strategy_mean_reversion(StrategyInterface):
     '''均值复归策略'''
-    def __init__(self, account, config_dict):
+    def __init__(self, account):
         super().__init__(account)
 
     def get_theta(self, data_df):
@@ -179,7 +180,13 @@ class Strategy_mean_reversion(StrategyInterface):
         # 买入逻辑
         unhold_currency_df:pd.DataFrame = currency_info_df[currency_info_df["is_hold"] == False]
         unhold_currency_df = unhold_currency_df.sort_values(by="theta", ascending=True)  # 用theta进行排序
-        target_symbol = unhold_currency_df.index[0]  # 选择theta最小的symbol作为交易对象
+        # 1. 选择theta最小的symbol作为交易对象
+        target_symbol = unhold_currency_df.index[0]
+        order = self.get_order(target_symbol, unhold_currency_df.loc[target_symbol, "theta"],
+                               unhold_currency_df.loc[target_symbol, "is_hold"], target_position)
+        order_list.append(order)
+        # 2. 选择theta最大的symbol作为交易对象
+        target_symbol = unhold_currency_df.index[-1]  # 选择theta最小的symbol作为交易对象
         order = self.get_order(target_symbol, unhold_currency_df.loc[target_symbol, "theta"],
                                unhold_currency_df.loc[target_symbol, "is_hold"], target_position)
         order_list.append(order)
@@ -189,26 +196,30 @@ class Strategy_mean_reversion(StrategyInterface):
         hold_currency_df = currency_info_df[currency_info_df["is_hold"] == True]
         if len(hold_currency_df):  # 如果有持仓，对于所有持仓的进行判断是否需要出售
             for target_symbol in hold_currency_df.index:
+                target_symbol_price = data_dict[target_symbol]['close'].values[-1]
                 order = self.get_order(target_symbol, hold_currency_df.loc[target_symbol, "theta"],
-                                       hold_currency_df.loc[target_symbol, "is_hold"], target_position, data_df=hold_currency_df)
+                                       hold_currency_df.loc[target_symbol, "is_hold"], target_position,symbol_price=target_symbol_price, data_df=hold_currency_df)
                 order_list.append(order)
                 order = None
 
         return order_list
 
-    def get_order(self, symbol, theta, is_hold, target_position, data_df=None):
+    def get_order(self, symbol, theta, is_hold, target_position, symbol_price=None, data_df=None):
 
         order = Order_Structure()
         order.symbol = symbol
         # 判断交易方向
 
         if not is_hold:
-            if theta < -2:  # 偏离度小于-2
+            is_buy = self.judge_buy(theta, )  # 买入逻辑
+            if is_buy:
                 order.direction = 'buy'
             else:
                 order.direction = 'hold'
         else:  # is hold
-            if theta > 0:  #  偏离度大于1
+            bid_price = data_df.loc[symbol, "bid_price"]
+            is_sell = self.judge_sell(symbol_price, bid_price)  # 卖出逻辑
+            if is_sell:
                 order.direction = 'sell'
             else:
                 order.direction = 'hold'
@@ -233,3 +244,22 @@ class Strategy_mean_reversion(StrategyInterface):
             order.amount = 0
 
         return order
+
+    def judge_buy(self, theta):
+        '''买入判断'''
+        if theta < -2 or theta > 2:
+            return True
+        else:
+            return False
+
+    def judge_sell(self, symbol_price, bid_price):
+        '''卖出判断'''
+        current_rtn = (symbol_price - bid_price) / bid_price
+        if current_rtn < -0.002:  # 止损平仓
+            return True
+        elif current_rtn > 0.006: # 止盈平仓  # todo 加入持仓时间的平仓
+            return True
+        else:
+            return False
+
+

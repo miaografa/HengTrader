@@ -19,8 +19,9 @@ def get_datetime_from_timestamp(timestamp):
     return pd.to_datetime(timestamp, utc=True, unit='ms')
 
 
-def run_trade(config_dict):
+def run_trade(config_dict, my_spot_account_s, strategy):
     '''运行交易主程序'''
+
     quote_currency = config_dict['quote_currency']
 
     # 1. 获取账号信息
@@ -33,7 +34,7 @@ def run_trade(config_dict):
             break
         except:
             print("获取账户列表第{i}次，失败".format(i=i))
-            time.sleep(1)
+            time.sleep(10)
             continue
 
     # 获取spot账户id
@@ -42,9 +43,7 @@ def run_trade(config_dict):
     # get balance of spot account
     account_balance_list = account_client.get_balance(spot_account.id)
 
-    # 创建本地的account对象，便于代码调用
-    my_spot_account_s = Account_Structure(spot_account.id)
-
+    # 更新本地的account对象的信息
     currency_info_df = config_dict['currency_info']  # 取出info df
     base_currency_list = config_dict['base_currencies']
     for account_balance_obj in account_balance_list:  # record balances of the quote and candidate currencies.
@@ -74,14 +73,11 @@ def run_trade(config_dict):
         price_dict[symbol] = prices_df  # 保存全部candidate的价格信息
 
     # 3. Trade or standby
-    # strategy = Strategy_trend(my_spot_account_s, config_dict)  # 趋势跟踪策略
-    strategy = Strategy_mean_reversion(my_spot_account_s, config_dict)  # mean reversion 策略
-    order_s_list = strategy.get_order_list(price_dict, target_position=0.3)  # todo 仓位设置不合理
+    order_s_list = strategy.get_order_list(price_dict, target_position=config_dict["fraction"])
 
     trade_client = TradeClient(api_key=g_api_key, secret_key=g_secret_key)
-
     for order_s in order_s_list:
-        order_id = create_order(my_spot_account_s.id, trade_client, order_s)
+        order_id = create_order(my_spot_account_s, trade_client, order_s, price_dict)
         print(order_id)
 
     return
@@ -99,12 +95,12 @@ def find_best_k_pair(config_dict):
     return k1, k2
 
 
-def before_start():
+def before_start(config_dict):
     '''
     交易开始前运行的函数
     会自动修改config_dict的内容
     '''
-    global config_dict
+    # 1. 初始化config_dict
     config_dict['base_currencies'] = [x[:-4] for x in config_dict['candidate_symbols']]
 
     currency_info_df = pd.DataFrame()
@@ -114,9 +110,24 @@ def before_start():
     currency_info_df["balance"] = 0
     currency_info_df["is_hold"] = False
     currency_info_df["theta"] = 0
+    currency_info_df["bid_price"] = 0   # 记录买入的成本价
 
     config_dict["currency_info"] = currency_info_df
 
+    # 2. 获取账号信息
+    account_client = AccountClient(api_key=g_api_key, secret_key=g_secret_key)
+    account_list = account_client.get_accounts()
+    # 获取spot账户id
+    spot_account = account_list[0]
+    assert spot_account.type == 'spot'
+    # 创建本地的account对象，便于代码调用
+    my_spot_account_s = Account_Structure(spot_account.id)
+
+    # 3. 初始化交易策略
+    # strategy = Strategy_trend(my_spot_account_s, config_dict)  # 趋势跟踪策略
+    strategy = Strategy_mean_reversion(my_spot_account_s)  # mean reversion 策略
+
+    return config_dict, my_spot_account_s, strategy
 
 
 if __name__ == "__main__":
@@ -127,14 +138,15 @@ if __name__ == "__main__":
        'yggusdt', 'xrpusdt', 'maticusdt'],
         market_t = 100,
         quote_currency='usdt',
-
+        fraction = 0.3,  # 买入比例
     )
-    before_start()
+    config_dict, my_spot_account_s, strategy = before_start(config_dict)
 
     while True:
         try:
-            time.sleep(10.)
-            run_trade(config_dict)
+            time.sleep(30.)
+            run_trade(config_dict, my_spot_account_s, strategy)
             print("执行完毕")
         except:
+            config_dict, my_spot_account_s, strategy = before_start(config_dict)
             continue
