@@ -12,6 +12,25 @@ Additionally, I plan to directly develop the trading component based on the ccxt
 
 # Strcuture
 Does such a simple project really need an introduction to the file structure?
+- [Bot](#Bot) - Relevant code and information about trading strategies and the bot are still being written...（交易策略和bot的相关代码，相关介绍还在撰写中……）
+  - backtest.py
+  - data_utils.py
+  - run_trade.py - Main program to run the overall trading bot, calling various trading strategy classes. (运行整体交易bot，调用各类交易策略的主程序)
+  - strategies.py - Records independent strategy objects.(记录独立的策略对象)
+  - strategy_utils.py
+  - trade_utils.py  - Utility functions for placing orders.(下单相关的工具函数)
+- [Research](#Research) - In the research section, I document my exploration process regarding cryptocurrency-related trading signals/strategies, primarily divided into two categories: (在research部分记录了我对于加密货币相关交易信号/策略的每次探索过程，主要分为两类：)
+  1. signals(信号)
+  2. Strategies(策略)
+
+
+# Bot
+
+# Research
+
+## Signals
+
+## Strategies
 
 
 ## Next steps
