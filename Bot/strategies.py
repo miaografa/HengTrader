@@ -174,7 +174,7 @@ class Strategy_mean_reversion(StrategyInterface):
             is_hold = position_value > 0.5  # 判断是否持仓，价值大于0.5 usd就是持有。
             currency_info_df.loc[symbol, "is_hold"] = is_hold
 
-            theta =  self.get_theta(data_df)
+            theta = self.get_theta(data_df)
             currency_info_df.loc[symbol, "theta"] = theta
 
         # 买入逻辑
@@ -186,7 +186,7 @@ class Strategy_mean_reversion(StrategyInterface):
                                unhold_currency_df.loc[target_symbol, "is_hold"], target_position)
         order_list.append(order)
         # 2. 选择theta最大的symbol作为交易对象
-        target_symbol = unhold_currency_df.index[-1]  # 选择theta最小的symbol作为交易对象
+        target_symbol = unhold_currency_df.index[-1]
         order = self.get_order(target_symbol, unhold_currency_df.loc[target_symbol, "theta"],
                                unhold_currency_df.loc[target_symbol, "is_hold"], target_position)
         order_list.append(order)
@@ -218,7 +218,7 @@ class Strategy_mean_reversion(StrategyInterface):
                 order.direction = 'hold'
         else:  # is hold
             bid_price = data_df.loc[symbol, "bid_price"]
-            is_sell = self.judge_sell(symbol_price, bid_price)  # 卖出逻辑
+            is_sell = self.judge_sell(theta, symbol_price, bid_price)  # 卖出逻辑
             if is_sell:
                 order.direction = 'sell'
             else:
@@ -247,17 +247,17 @@ class Strategy_mean_reversion(StrategyInterface):
 
     def judge_buy(self, theta):
         '''买入判断'''
-        if theta < -2 or theta > 2:
+        if theta < -1:
             return True
         else:
             return False
 
-    def judge_sell(self, symbol_price, bid_price):
+    def judge_sell(self, theta, symbol_price, bid_price):
         '''卖出判断'''
         current_rtn = (symbol_price - bid_price) / bid_price
         if current_rtn < -0.002:  # 止损平仓
             return True
-        elif current_rtn > 0.006: # 止盈平仓  # todo 加入持仓时间的平仓
+        elif current_rtn > 0.006 or theta > 1:  # 止盈平仓  # todo 加入持仓时间的平仓
             return True
         else:
             return False
