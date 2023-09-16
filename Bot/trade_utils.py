@@ -1,7 +1,5 @@
-from huobi.client.account import AccountClient
-from huobi.client.trade import TradeClient
-from huobi.constant import *
-from huobi.utils import *
+import logging
+from binance.error import ClientError
 
 class Order_Structure(object):
     '''Order的结构体'''
@@ -17,53 +15,47 @@ class Order_Structure(object):
         print('direction:', self.direction)
 
 
-class Account_Structure(object):
-    '''Account的结构体'''
-    def __init__(self, id, quote_currency='usdt', balance_quote_currency=0, candidate_symbols_list = []):
-        self.id = id
-        self.quote_currency = quote_currency
-        self.balance_quote_currency = balance_quote_currency
-        self.candidate_symbols_list = candidate_symbols_list
-        self.currency_info_df = None
-        self.asset_valuation = 0
-
-    def print_info(self):
-        print('spot_account_id: ', self.id)
-        print('balance_quote_currency:', self.balance_quote_currency)
-
-
-def create_order(my_spot_account_s, trade_client, order_s:Order_Structure, price_dict):
+def create_order(info_controller, trade_client, order_s:Order_Structure):
     # todo 目前设置的都是按照Market 买入卖出
-    account_id = my_spot_account_s.id
+
     symbol = order_s.symbol
     amount = order_s.amount
-    direction = order_s.direction
-    if direction=='buy':
-        print(symbol)
-        order_id = trade_client.create_order(symbol=symbol, account_id=account_id, order_type=OrderType.BUY_MARKET,
-                                          source=OrderSource.API, amount=amount, price=None)
-        LogInfo.output("created buy order id : {id}".format(id=order_id))
-        # 更新持仓成本
-        my_spot_account_s.currency_info_df.loc[symbol, "bid_price"] = price_dict[symbol]['close'].values[-1]
+    side = order_s.direction
 
-    elif direction=='sell':
-        order_id = trade_client.create_order(symbol=symbol, account_id=account_id, order_type=OrderType.SELL_MARKET,
-                                             source=OrderSource.API, amount=amount, price=None)
-        LogInfo.output("created sell order id : {id}".format(id=order_id))
-        # 更新持仓成本
-        my_spot_account_s.currency_info_df.loc[symbol, "bid_price"] = 0
+    params = {
+        "symbol": symbol,
+        "side": side.upper(),
+        "type": "MARKET",
+        "timeInForce": "GTC",
+        "quantity": amount,
+    }
 
-    elif direction=='hold':
-        order_id = None
-    return order_id
+    price_dict = info_controller.strategy_info.price_dict
+    try:
+        if side == 'buy':
+            response = trade_client.new_order(**params)
+            # 更新持仓成本
+            info_controller.account_info.position_df.loc[symbol, "bid_price"] = price_dict[symbol]['close'].values[-1]
+        elif side == 'sell':
+            response = trade_client.new_order(**params)
+            # 更新持仓成本
+            info_controller.account_info.position_df.loc[symbol, "bid_price"] = 0
+        elif side == 'hold':
+            response = None
+
+        logging.info(response)
+    except ClientError as error:
+        logging.error(
+            "Found error. status: {}, error code: {}, error message: {}".format(
+                error.status_code, error.error_code, error.error_message
+            )
+        )
+
+    return response
 
 
 def cancel_order(trade_client, order_id, symbol):
-    canceled_order_id = trade_client.cancel_order(symbol, order_id)
-    if canceled_order_id == order_id:
-        LogInfo.output("cancel order {id} done".format(id=canceled_order_id))
-    else:
-        LogInfo.output("cancel order {id} fail".format(id=canceled_order_id))
+    pass
 
 
 
