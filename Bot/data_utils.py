@@ -25,6 +25,20 @@ def get_market_prices(symbol:str, interval):
 
 
 
+
+def get_decimal_precision(number_str):
+    # 判断是否有小数部分
+    if '.' in number_str:
+        # 获取小数部分
+        decimal_part = number_str.strip("0").split('.')[1]
+        # 返回小数部分的位数
+        return len(decimal_part)
+    else:
+        # 没有小数部分，精度为0
+        return 0
+
+
+
 if __name__ == "__main__":
     symbol = 'xrpusdt'.upper()  # todo check whether this currency exist or not.
     interval = "1m"

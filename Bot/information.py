@@ -1,6 +1,8 @@
 import pandas as pd
 from binance.spot import Spot as SpotClient
 
+from data_utils import get_decimal_precision
+from privateconfig import *
 
 
 class Info_Controller():
@@ -38,7 +40,7 @@ class Account_Info(Info_Interface):
     def __init__(self, config_dict):
         super().__init__()
         self.position_df = None
-        self.UDST_value = None
+        self.USDT_value = None
         self.account_value = None
 
     def init_info(self, client):
@@ -81,21 +83,28 @@ class Account_Info(Info_Interface):
         position_df["balance"] = position_df["free"] * position_df["price"]
         position_df["is_hold"] = position_df["balance"] > 5
         # 用当前价格，初始化已经持仓的成本价。"bid_price"
-        position_df["bid_price"] = 0
+        position_df["bid_price"] = 0.001
         condition = position_df["is_hold"]
         position_df.loc[condition, "bid_price"] = position_df.loc[condition, "price"]
 
         self.position_df = position_df
         self.account_value = self.position_df["balance"].sum()
+
         return
+
 
     def update_info(self, client):
         '''
         update free, locked value
         '''
         position_df = self.position_df
+
         account_infomation = client.account()  # Get new account info
         new_position_df = pd.DataFrame(account_infomation['balances'])
+        # update USDT_value
+        self.USDT_value = float(new_position_df[new_position_df["asset"] == "USDT"]['free'].values[0])
+
+
         position_df.drop(columns=["free", "locked", "price", "balance", "is_hold"], inplace=True)
         position_df.reset_index(inplace=True)
         position_df = pd.merge(position_df, new_position_df, on="asset", how='left')
@@ -147,9 +156,12 @@ class Strategy_Info(Info_Interface):
         '''
         self.check_symbols(client)
         self.theta_info_df = pd.DataFrame({'symbol': self.candidate_symbols})  # theta_info_df
-        self.theta_info_df['theta'] = 0
+        self.theta_info_df['theta'] = 0.001
         self.theta_info_df.set_index('symbol', inplace=True, drop=True)
-        self.price_dict = dict()  # price_dic
+        self.get_trade_decimal_precision(client)  # 获取每个交易对支持的交易精度，加入到theta_info_df["stepDecimal"]
+
+
+        self.price_dict = dict()  # price_dict
         return
 
     def check_symbols(self, client):
@@ -177,14 +189,30 @@ class Strategy_Info(Info_Interface):
         self.price_dict = price_dict
         return
 
+    def get_trade_decimal_precision(self, client):
+        self.theta_info_df["stepDecimal"] = 2
+        for temp_symbol in self.candidate_symbols:
+            print("temp_symbol:", temp_symbol)
+            temp_info_dict = client.exchange_info(symbol=temp_symbol)
+            temp_stepSize = temp_info_dict['symbols'][0]['filters'][1]['stepSize']
+            temp_decimal_precision = get_decimal_precision(temp_stepSize)
+            self.theta_info_df.loc[temp_symbol,"stepDecimal"] = temp_decimal_precision
+
+        pass
+
 
 
 if __name__ == "__main__":
     util_config = dict(
-        candidate_symbols=['compusdt', 'aaveusdt', 'solusdt', 'bsvusdt', 'aptusdt', 'etcusdt',
-                           'ordiusdt', 'avaxusdt', 'fxsusdt', 'axsusdt', 'maskusdt',
-                           'tonusdt', 'filusdt', 'dydxusdt', 'revousdt', 'arbusdt', 'ldousdt',
-                           'yggusdt', 'xrpusdt', 'maticusdt'],
+        candidate_symbols=['AUTOUSDT', 'ETHBULLUSDT', 'BNBBULLUSDT', 'BNBBEARUSDT', 
+        'SUSHIDOWNUSDT', 'TRBUSDT', 'AAVEUSDT', 'BTGUSDT', 'EOSBEARUSDT', 'BCHSVUSDT', 
+        'LTCUSDT', 'ALCXUSDT', 'BEARUSDT', 'ETHBEARUSDT', 'COMPUSDT', 'EGLDUSDT', 
+        'QNTUSDT', 'XRPBULLUSDT', 'FTTUSDT', 'RGTUSDT', 'ANYUSDT', 'SSVUSDT', 
+        'GMXUSDT', 'HIFIUSDT', 'UNFIUSDT', 'EOSBULLUSDT', 'NMRUSDT', 'NANOUSDT', 
+        'SOLUSDT', 'AUCTIONUSDT', 'MULTIUSDT', 'ATOMUSDT', 'XTZDOWNUSDT', 'ETCUSDT', 
+        'AXSUSDT', 'USTUSDT', 'WLDUSDT', 'ARUSDT', 'CYBERUSDT', 'WINGUSDT', 'INJUSDT', 
+        'RUNEUSDT', 'LINKUSDT', 'MTLUSDT',  'AVAXUSDT', 'XVSUSDT', 'FORTHUSDT', 
+        'COCOSUSDT', 'OGUSDT'],
         quote_currency='usdt',
     )
     strategy_config = dict(
@@ -203,15 +231,17 @@ if __name__ == "__main__":
                 "https://api4.binance.com"]
 
     # API key/secret are required for user data endpoints
-    client = SpotClient(api_key='zRfTZ4CxN3miDrern5auCgEf3vqdoEE4FeEmEIc3jTvmq499XRPUWXdqyfse2tp5',
-                        api_secret='AwOHERBTzNXIFsfovVEG56mvXp5wjb2ZkXOjqjMFshVxW4LqmRyGo5G7TKIjCvDg',
+    client = SpotClient(api_key=g_api_key,
+                        api_secret=g_secret_key,
                         base_url=API_urls[3])
 
     info_c = Info_Controller(config_dict, client)
-    print(info_c.account_info.position_df)
-    print(info_c.account_info.account_value)
+    # print(info_c.account_info.position_df)
+    # print(info_c.account_info.account_value)
 
-    symbol = "COMPUSDT"
-    info_c.account_info.position_df.loc[symbol, "free"] = 0.1
+    # symbol = "COMPUSDT"
+    # info_c.account_info.position_df.loc[symbol, "free"] = 0.1
 
-    info_c.update_info_all(client)  # test update
+    # info_c.update_info_all(client)  # test update
+
+    print(info_c.strategy_info.theta_info_df)
