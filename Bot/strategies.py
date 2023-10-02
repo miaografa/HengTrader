@@ -116,10 +116,10 @@ class Strategy_mean_reversion(StrategyInterface):
         # 计算买入量
         if order.direction == 'buy':  # buy base currency
             balance = info_controller.account_info.USDT_value
-            if balance > 200:
-                order.amount = 150.
-            elif balance > 100:
+            if balance > 110:
                 order.amount = 100.
+            elif balance > 50:
+                order.amount = 50.
             else:
                 order.amount = 0.
                 order.direction = 'hold'  # Too little cash to buy anything
@@ -147,7 +147,7 @@ class Strategy_mean_reversion(StrategyInterface):
 
     def judge_buy(self, theta):
         '''买入判断'''
-        if theta < -2.2:
+        if theta < -2.0:
             return True
         else:
             return False
@@ -161,10 +161,10 @@ class Strategy_mean_reversion(StrategyInterface):
         logging.info("current_rtn:{}".format(current_rtn))
         logging.info('---------------------------------------------------------')
 
-        if current_rtn < -0.06:  # 止损平仓
+        if current_rtn < -0.02:  # 止损平仓
             return True
         # elif current_rtn > 0.006 or theta > 1:  # 止盈平仓  # todo 加入持仓时间的平仓
-        elif theta > 1.6:  # 止盈平仓  # todo 加入持仓时间的平仓
+        elif theta > 1.3:  # 止盈平仓  # todo 加入持仓时间的平仓
             return True
         else:
             return False
