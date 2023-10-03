@@ -18,10 +18,14 @@ def get_market_prices(symbol:str, interval):
                     'low': float,
                     'close':float,
                     'volume':float,
+                    "Quote_asset_volume":float,
                     }
     price_df = price_df.astype(convert_dict)
 
-    return price_df[["open", "high", "low", "close", "volume"]]
+    # 重命名列
+    price_df.rename(columns={"Quote_asset_volume": "quote_volume"}, inplace=True)
+
+    return price_df[["open", "high", "low", "close", "volume", "quote_volume"]]
 
 
 
