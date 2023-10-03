@@ -2,19 +2,16 @@ from binance.spot import Spot as SpotClient
 
 from information import Info_Controller
 from data_utils import get_market_prices
-from strategies import *
-from trade_utils import create_order, cancel_order
-
-import pandas as pd
+from Bot.strategies.strategies import *
+from trade_utils import create_order
 
 from privateconfig import *  # import the api keys
 
+import pandas as pd
 import time
-
 import logging
 
 logging.basicConfig(level=logging.INFO)
-
 
 
 def get_datetime_from_timestamp(timestamp):
@@ -137,3 +134,5 @@ if __name__ == "__main__":
             config_dict, my_spot_account_s, strategy = before_start(config_dict, api_url)
             i += 1
             continue
+
+
