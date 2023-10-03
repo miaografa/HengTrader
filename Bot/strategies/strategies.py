@@ -3,9 +3,11 @@ import numpy as np
 import random
 import logging
 
-from Bot.trade_utils import Order_Structure
-from Bot.strategies.reverse_detector import Reverse_Detector, Features_Calculator
-from strategy_utils import calculate_position_value, np_round_floor
+
+
+from ..trade_utils import Order_Structure
+from ..strategies.reverse_detector import Reverse_Detector, Features_Calculator
+from .strategy_utils import calculate_position_value, np_round_floor
 
 
 
@@ -27,7 +29,7 @@ class Strategy_mean_reversion(StrategyInterface):
     '''均值复归策略'''
     def __init__(self):
         super().__init__()
-        self.reverse_detector = Reverse_Detector(model_save_path='./models/')
+        self.reverse_detector = Reverse_Detector(model_save_path='./Bot/models/')
         self.features_calculator = Features_Calculator()
 
     def get_theta(self, data_df):

@@ -1,9 +1,13 @@
 from binance.spot import Spot as SpotClient
 
-from information import Info_Controller
-from data_utils import get_market_prices
+import sys
+
+sys.path.append('.')
+
+from Bot.information import Info_Controller
+from Bot.data_utils import get_market_prices
 from Bot.strategies.strategies import *
-from trade_utils import create_order
+from Bot.trade_utils import create_order
 
 from privateconfig import *  # import the api keys
 
@@ -128,7 +132,7 @@ if __name__ == "__main__":
             time.sleep(1.)
             run_trade(config_dict, info_controller, strategy, api_url)
             print("执行完毕")
-            time.sleep(120.)
+            time.sleep(60.)
         except:
             api_url = API_urls[i%6]
             config_dict, my_spot_account_s, strategy = before_start(config_dict, api_url)
