@@ -1,5 +1,7 @@
 from binance.spot import Spot as SpotClient
 
+import sys
+sys.path.append("..")  # Adds higher directory to python modules path.
 from information import Info_Controller
 from data_utils import get_market_prices
 from Bot.strategies.strategies import *
@@ -128,7 +130,7 @@ if __name__ == "__main__":
             time.sleep(1.)
             run_trade(config_dict, info_controller, strategy, api_url)
             print("执行完毕")
-            time.sleep(120.)
+            time.sleep(400.)
         except:
             api_url = API_urls[i%6]
             config_dict, my_spot_account_s, strategy = before_start(config_dict, api_url)
