@@ -125,16 +125,16 @@ if __name__ == "__main__":
 
     while True:
         i = 0
-        try:
-            api_url = API_urls[i%6]
-            time.sleep(1.)
-            run_trade(config_dict, info_controller, strategy, api_url)
-            print("执行完毕")
-            time.sleep(400.)
-        except:
-            api_url = API_urls[i%6]
-            config_dict, my_spot_account_s, strategy = before_start(config_dict, api_url)
-            i += 1
-            continue
+        # try:
+        api_url = API_urls[i%6]
+        time.sleep(1.)
+        run_trade(config_dict, info_controller, strategy, api_url)
+        print("执行完毕")
+        time.sleep(1.)
+        # except:
+        #     api_url = API_urls[i%6]
+        #     config_dict, my_spot_account_s, strategy = before_start(config_dict, api_url)
+        #     i += 1
+        #     continue
 
 

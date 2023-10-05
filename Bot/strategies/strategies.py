@@ -116,7 +116,7 @@ class Strategy_mean_reversion(StrategyInterface):
         # 计算买入量
         if order.direction == 'buy':  # buy base currency
             balance = info_controller.account_info.USDT_value
-            if balance > 110:
+            if balance > 250:
                 order.amount = 100.
             elif balance > 50:
                 order.amount = 50.
@@ -147,15 +147,15 @@ class Strategy_mean_reversion(StrategyInterface):
 
     def judge_buy(self, theta, symbol, info_controller):
         '''买入判断'''
-        ml_pred = self.get_ml_prediction(symbol, info_controller, direction='up')
-        if theta < -1.9 and ml_pred > 0.3:  # -1.9_1.3_0.3_0.4
+        ml_pred = self.get_ml_prediction(symbol, info_controller)
+        if theta < -2.2 and ml_pred > 0.5:  
             return True
         else:
             return False
 
     def judge_sell(self, symbol, theta, symbol_price, bid_price, info_controller):
         '''卖出判断'''
-        ml_pred = self.get_ml_prediction(symbol, info_controller, direction='down')
+        ml_pred = self.get_ml_prediction(symbol, info_controller)
 
         current_rtn = (symbol_price - bid_price) / bid_price
 
@@ -164,18 +164,18 @@ class Strategy_mean_reversion(StrategyInterface):
         # logging.info("current_rtn:{}".format(current_rtn))
         # logging.info('---------------------------------------------------------')
 
-        if current_rtn < -0.02:  # 止损平仓
+        if current_rtn < -0.07:  # 止损平仓
             return True
         # elif current_rtn > 0.006 or theta > 1:  # 止盈平仓  # todo 加入持仓时间的平仓
-        elif theta > 1.3 and ml_pred > 0.4:  # 止盈平仓s
+        elif theta > 1.5 and ml_pred < 0.4:  # 止盈平仓s
             return True
         else:
             return False
 
-    def get_ml_prediction(self, symbol, info_controller, direction):
+    def get_ml_prediction(self, symbol, info_controller):
         price_df = info_controller.strategy_info.price_dict[symbol]
         factor_df = self.features_calculator.get_all_features(price_df)
-        prediction = self.reverse_detector.get_machine_learning_pridictions(factor_df, direction=direction)
+        prediction = self.reverse_detector.get_machine_learning_pridictions(factor_df)
         logging.info('--------------------get_ml_prediction---------------------------')
         logging.info("symbol:{}".format(symbol))
         logging.info("prediction:{}".format(prediction))
