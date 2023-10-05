@@ -1,5 +1,7 @@
 from binance.spot import Spot as SpotClient
 
+import sys
+sys.path.append("..")  # Adds higher directory to python modules path.
 from information import Info_Controller
 from data_utils import get_market_prices
 from Bot.strategies.strategies import *

@@ -128,7 +128,7 @@ from ta.utils import dropna
 class Reverse_Detector(object):
     def __init__(self, model_save_path):
         self.model_save_path = model_save_path
-        self.xgb_up, self.xgb_down = self.load_xgb_models(model_save_path)
+        self.xgb_model = self.load_xgb_models(model_save_path)
 
     def read_model(self, model_save_path, model_name):
         with open(model_save_path + model_name, 'rb') as file:
@@ -136,9 +136,8 @@ class Reverse_Detector(object):
         return model
 
     def load_xgb_models(self, model_save_path = './models/'):
-        xgb_up = self.read_model(model_save_path, 'best_xgboost_reverse_up.pkl')
-        xgb_down = self.read_model(model_save_path, 'best_xgboost_reverse_down.pkl')
-        return xgb_up, xgb_down
+        xgb_model = self.read_model(model_save_path, 'best_xgboost_model2.pkl')
+        return xgb_model
 
     def get_machine_learning_pridictions(self, factor_df, direction='up'):
         '''
@@ -149,10 +148,7 @@ class Reverse_Detector(object):
                     'theta_quote_volume', 'theta_volume_obv', 'trend_cci', 'macd',
                     'trend_adx']
         data_df = factor_df[col_list].copy()
-        if direction == 'up':
-            y_predict = self.xgb_up.predict_proba(data_df.iloc[-1:, :])
-        elif direction == 'down':
-            y_predict = self.xgb_down.predict_proba(data_df.iloc[-1:, :])
+        y_predict = self.xgb_model.predict_proba(data_df.iloc[-1:, :])
         return y_predict[0][1]
 
 
