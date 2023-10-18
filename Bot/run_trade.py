@@ -30,14 +30,22 @@ def run_trade(config_dict, info_controller, strategy, api_url):
     # 1. 更新信息
     info_controller.update_info_all(client)  # 更新账户信息，主要是用新的持仓情况更新position_df
 
-
     # 2. 获取市场信息 don't need api key
     price_dict = dict()
+
+    # 2.1 获取全部candidate的价格信息
     candidate_symbols = info_controller.strategy_info.candidate_symbols
     for symbol in candidate_symbols:
         interval = "15m"
         prices_df = get_market_prices(symbol, interval)  # pd最下的是最新价格
         price_dict[symbol] = prices_df  # 保存全部candidate的价格信息
+
+    # 2.2 更新BTC ETH 价格信息
+    for symbol in ["BTCUSDT", "ETHUSDT"]:
+        interval = "15m"
+        prices_df = get_market_prices(symbol, interval)  # pd最下的是最新价格
+        price_dict[symbol] = prices_df  # 保存全部candidate的价格信息
+
     info_controller.strategy_info.update_price_dict(price_dict)  # 更新价格信息
 
     # 3. Trade or standby

@@ -160,9 +160,9 @@ class Strategy_Info(Info_Interface):
         self.theta_info_df.set_index('symbol', inplace=True, drop=True)
         self.get_trade_decimal_precision(client)  # 获取每个交易对支持的交易精度，加入到theta_info_df["stepDecimal"]
 
-
         self.price_dict = dict()  # price_dict
         return
+
 
     def check_symbols(self, client):
         '''
@@ -185,9 +185,11 @@ class Strategy_Info(Info_Interface):
             print("All candidate symbols are in market_symbols")
         return
 
+
     def update_price_dict(self, price_dict):
         self.price_dict = price_dict
         return
+
 
     def get_trade_decimal_precision(self, client):
         self.theta_info_df["stepDecimal"] = 2

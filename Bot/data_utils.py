@@ -44,7 +44,7 @@ def get_decimal_precision(number_str):
 
 
 if __name__ == "__main__":
-    symbol = 'xrpusdt'.upper()  # todo check whether this currency exist or not.
-    interval = "1m"
+    symbol = 'ETHUSDT'.upper()
+    interval = "15m"
     price_df = get_market_prices(symbol, interval)
     print(price_df)

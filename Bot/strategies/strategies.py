@@ -30,6 +30,7 @@ class Strategy_mean_reversion(StrategyInterface):
         self.reverse_detector = Reverse_Detector(model_save_path='./models/')
         self.features_calculator = Features_Calculator()
 
+
     def get_theta(self, data_df):
         Boll_df = pd.DataFrame(index=data_df.index)
 
@@ -44,9 +45,10 @@ class Strategy_mean_reversion(StrategyInterface):
         return Boll_df['theta'].values[-1]
 
 
-    def get_order_list(self, info_controller, target_position=1.):
-
-        order_list = []
+    def update_info(self, info_controller):
+        '''
+            1. 对于info_controller的信息进行更新
+        '''
         data_dict = info_controller.strategy_info.price_dict
         candidate_symbols = info_controller.strategy_info.candidate_symbols
 
@@ -66,16 +68,30 @@ class Strategy_mean_reversion(StrategyInterface):
             else:
                 info_controller.strategy_info.theta_info_df.loc[symbol, "is_hold"] = False
 
+        return info_controller
+
+    def get_order_list(self, info_controller, target_position=1.):
+
+        order_list = []
+        # 1. 更新 inforcontroller 的 ishold 信息
+        info_controller = self.update_info(info_controller)
+
+        data_dict = info_controller.strategy_info.price_dict
         theta_info_df = info_controller.strategy_info.theta_info_df
+
+        # 2. 更新并且记录btc 和 eth的features
+        self.features_calculator.save_market_coin_data(data_dict["BTCUSDT"], coin_name="btc")
+        self.features_calculator.save_market_coin_data(data_dict["ETHUSDT"], coin_name="eth")
 
         unhold_currency_df = theta_info_df[theta_info_df["is_hold"] == False]
         unhold_currency_df = unhold_currency_df.sort_values(by="theta", ascending=True)  # 用theta进行排序
-        # 1. 选择theta最小的symbol作为交易对象
-        target_symbol = unhold_currency_df.index[0]
-        target_symbol_price = data_dict[target_symbol]['close'].values[-1]
-        order = self.get_order(target_symbol, unhold_currency_df.loc[target_symbol, "theta"],
-                               unhold_currency_df.loc[target_symbol, "is_hold"], target_position, symbol_price=target_symbol_price, info_controller=info_controller)
-        order_list.append(order)
+        # 1. 选择theta较小的coin 作为交易对象
+        target_unhold_currency_df = unhold_currency_df[unhold_currency_df["theta"] < -1]
+        for target_symbol in target_unhold_currency_df.index:
+            target_symbol_price = data_dict[target_symbol]['close'].values[-1]
+            order = self.get_buy_order(target_symbol, unhold_currency_df.loc[target_symbol, "theta"],
+                                   target_position, symbol_price=target_symbol_price, info_controller=info_controller)
+            order_list.append(order)
         order = None
 
         # 2. 卖出逻辑
@@ -84,34 +100,28 @@ class Strategy_mean_reversion(StrategyInterface):
         if len(hold_currency_df):  # 如果有持仓，对于所有持仓的进行判断是否需要出售
             for target_symbol in hold_currency_df.index:
                 target_symbol_price = data_dict[target_symbol]['close'].values[-1]
-                order = self.get_order(target_symbol, hold_currency_df.loc[target_symbol, "theta"],
-                                       hold_currency_df.loc[target_symbol, "is_hold"], target_position, symbol_price=target_symbol_price, info_controller=info_controller)
+                order = self.get_sell_order(target_symbol, hold_currency_df.loc[target_symbol, "theta"],
+                                       target_position, symbol_price=target_symbol_price, info_controller=info_controller)
                 order_list.append(order)
                 order = None
 
         return order_list
 
-    def get_order(self, symbol, theta, is_hold, target_position, symbol_price=None, info_controller=None):
+
+    def get_buy_order(self, symbol, theta, target_position, symbol_price, info_controller):
         '''
-        当前版本target_position 没有用到
+            买入逻辑
+            包括买入判断和买入量的计算
+            return order
         '''
         order = Order_Structure()
         order.symbol = symbol
-        # 判断交易方向
 
-        if not is_hold:
-            is_buy = self.judge_buy(theta, symbol, info_controller)  # 买入逻辑
-            if is_buy:
-                order.direction = 'buy'
-            else:
-                order.direction = 'hold'
-        else:  # is hold
-            bid_price = info_controller.account_info.position_df.loc[symbol, "bid_price"]
-            is_sell = self.judge_sell(symbol, theta, symbol_price, bid_price, info_controller)  # 卖出逻辑
-            if is_sell:
-                order.direction = 'sell'
-            else:
-                order.direction = 'hold'
+        is_buy = self.judge_buy(theta, symbol, info_controller)  # 买入逻辑
+        if is_buy:
+            order.direction = 'buy'
+        else:
+            order.direction = 'hold'
 
         # 计算买入量
         if order.direction == 'buy':  # buy base currency
@@ -125,17 +135,36 @@ class Strategy_mean_reversion(StrategyInterface):
                 order.direction = 'hold'  # Too little cash to buy anything
 
             order.amount = np_round_floor(order.amount, 4)  # devided by the price!!!
-            
-            logging.info('--------------------------------------------------------')
-            logging.info("order.symbol:{}".format( order.symbol))
-            logging.info("target_position:{}".format( target_position))
-            logging.info("balance:{}".format( balance))
-            logging.info("balance * target_position:{}".format( balance * target_position))
-            logging.info("symbol_price: {}".format( symbol_price))
-            logging.info('--------------------------------------------------------')
-            
 
-        elif order.direction == 'sell':  # sell base currency
+            logging.info('--------------------------------------------------------')
+            logging.info("order.symbol:{}".format(order.symbol))
+            logging.info("target_position:{}".format(target_position))
+            logging.info("balance:{}".format(balance))
+            logging.info("balance * target_position:{}".format(balance * target_position))
+            logging.info("symbol_price: {}".format(symbol_price))
+            logging.info('--------------------------------------------------------')
+
+        elif order.direction == 'hold':  # buy base currency
+            order.amount = 0
+
+        return order
+
+
+    def get_sell_order(self, symbol, theta, target_position, symbol_price, info_controller):
+        '''
+        当前版本target_position 没有用到
+        '''
+        order = Order_Structure()
+        order.symbol = symbol
+        # 判断交易方向
+        bid_price = info_controller.account_info.position_df.loc[symbol, "bid_price"]
+        is_sell = self.judge_sell(symbol, theta, symbol_price, bid_price, info_controller)  # 卖出逻辑
+        if is_sell:
+            order.direction = 'sell'
+        else:
+            order.direction = 'hold'
+
+        if order.direction == 'sell':  # sell base currency
             order.amount = info_controller.account_info.position_df.loc[symbol, "free"]
             stepDecimal = info_controller.strategy_info.theta_info_df.loc[symbol,"stepDecimal"]
             order.amount = np_round_floor(order.amount, stepDecimal)
@@ -145,13 +174,15 @@ class Strategy_mean_reversion(StrategyInterface):
 
         return order
 
+
     def judge_buy(self, theta, symbol, info_controller):
         '''买入判断'''
         ml_pred = self.get_ml_prediction(symbol, info_controller)
-        if theta < -2.2 and ml_pred > 0.5:  
+        if theta < -1 and ml_pred > 0.622:
             return True
         else:
             return False
+
 
     def judge_sell(self, symbol, theta, symbol_price, bid_price, info_controller):
         '''卖出判断'''
@@ -164,17 +195,21 @@ class Strategy_mean_reversion(StrategyInterface):
         # logging.info("current_rtn:{}".format(current_rtn))
         # logging.info('---------------------------------------------------------')
 
-        if current_rtn < -0.07:  # 止损平仓
+        if current_rtn < -0.05:  # 止损平仓
             return True
-        # elif current_rtn > 0.006 or theta > 1:  # 止盈平仓  # todo 加入持仓时间的平仓
-        elif theta > 1.5 and ml_pred < 0.4:  # 止盈平仓s
+        elif theta > 1. and ml_pred < 0.34:  # 止盈平仓s
             return True
         else:
             return False
 
+
     def get_ml_prediction(self, symbol, info_controller):
+
         price_df = info_controller.strategy_info.price_dict[symbol]
-        factor_df = self.features_calculator.get_all_features(price_df)
+
+        factor_df = self.features_calculator.get_all_features_add_market_coin(price_df)
+        factor_df = factor_df[self.features_calculator.all_X_cols]
+
         prediction = self.reverse_detector.get_machine_learning_pridictions(factor_df)
         logging.info('--------------------get_ml_prediction---------------------------')
         logging.info("symbol:{}".format(symbol))
