@@ -2,10 +2,12 @@ import pandas as pd
 import numpy as np
 import random
 import logging
+import sys
+sys.path.append("../")
 
-from Bot.trade_utils import Order_Structure
-from Bot.strategies.reverse_detector import Reverse_Detector, Features_Calculator
-from strategy_utils import calculate_position_value, np_round_floor
+from trade_utils import Order_Structure
+from strategies.reverse_detector import Reverse_Detector, Features_Calculator
+from strategies.strategy_utils import calculate_position_value, np_round_floor
 
 
 
@@ -27,7 +29,7 @@ class Strategy_mean_reversion(StrategyInterface):
     '''均值复归策略'''
     def __init__(self):
         super().__init__()
-        self.reverse_detector = Reverse_Detector(model_save_path='./models/')
+        self.reverse_detector = Reverse_Detector(model_save_path='./Bot/models/')
         self.features_calculator = Features_Calculator()
 
 
@@ -126,10 +128,10 @@ class Strategy_mean_reversion(StrategyInterface):
         # 计算买入量
         if order.direction == 'buy':  # buy base currency
             balance = info_controller.account_info.USDT_value
-            if balance > 250:
-                order.amount = 100.
-            elif balance > 50:
+            if balance > 100:
                 order.amount = 50.
+            elif balance > 50:
+                order.amount = 20.
             else:
                 order.amount = 0.
                 order.direction = 'hold'  # Too little cash to buy anything
@@ -178,7 +180,7 @@ class Strategy_mean_reversion(StrategyInterface):
     def judge_buy(self, theta, symbol, info_controller):
         '''买入判断'''
         ml_pred = self.get_ml_prediction(symbol, info_controller)
-        if theta < -1 and ml_pred > 0.622:
+        if theta < -1.2 and ml_pred > 0.705:
             return True
         else:
             return False
@@ -197,7 +199,7 @@ class Strategy_mean_reversion(StrategyInterface):
 
         if current_rtn < -0.05:  # 止损平仓
             return True
-        elif theta > 1. and ml_pred < 0.34:  # 止盈平仓s
+        elif theta > 1.2 and ml_pred < 0.305:  # 止盈平仓s
             return True
         else:
             return False

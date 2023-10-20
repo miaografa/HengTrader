@@ -23,7 +23,7 @@ class Reverse_Detector(object):
         return model
 
     def load_xgb_models(self, model_save_path = './models/'):
-        xgb_model = self.read_model(model_save_path, 'best_xgboost_rich_model.pkl')
+        xgb_model = self.read_model(model_save_path, 'best_xgboost_rich_model_1_1.pkl')
         return xgb_model
 
 
@@ -48,8 +48,8 @@ class Features_Calculator(object):
         ]
 
         self.co_diff_target_cols = ['momentum_rsi', 'theta_volume_obv', 'macd', 'trend_cci', 'trend_adx']
-        self.co_diff_target_cols_btc = ['co_diff_' + x + "_btc" for x in co_diff_target_cols]
-        self.co_diff_target_cols_eth = ['co_diff_' + x + "_eth" for x in co_diff_target_cols]
+        self.co_diff_target_cols_btc = ['co_diff_' + x + "_btc" for x in self.co_diff_target_cols]
+        self.co_diff_target_cols_eth = ['co_diff_' + x + "_eth" for x in self.co_diff_target_cols]
 
         self.btc_X_cols = [x + "_btc" for x in self.X_cols]
         self.eth_X_cols = [x + "_eth" for x in self.X_cols]
@@ -232,8 +232,6 @@ class Features_Calculator(object):
 if __name__ == '__main__':
 
     from Bot.data_utils import get_market_prices
-
-    co_diff_target_cols = ['momentum_rsi', 'theta_volume_obv', 'macd', 'trend_cci', 'trend_adx']
 
     btc_price_df = get_market_prices('BTCUSDT', '15m')
     eth_price_df = get_market_prices('ETHUSDT', '15m')
