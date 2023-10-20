@@ -88,7 +88,9 @@ class Strategy_mean_reversion(StrategyInterface):
         unhold_currency_df = theta_info_df[theta_info_df["is_hold"] == False]
         unhold_currency_df = unhold_currency_df.sort_values(by="theta", ascending=True)  # 用theta进行排序
         # 1. 选择theta较小的coin 作为交易对象
-        target_unhold_currency_df = unhold_currency_df[unhold_currency_df["theta"] < -1]
+        logging.info("unhold_currency_df:{}".format(unhold_currency_df))
+        target_unhold_currency_df = unhold_currency_df[unhold_currency_df["theta"] < -1.2]
+        logging.info("target_unhold_currency_df:{}".format(target_unhold_currency_df.index))
         for target_symbol in target_unhold_currency_df.index:
             target_symbol_price = data_dict[target_symbol]['close'].values[-1]
             order = self.get_buy_order(target_symbol, unhold_currency_df.loc[target_symbol, "theta"],
@@ -180,7 +182,13 @@ class Strategy_mean_reversion(StrategyInterface):
     def judge_buy(self, theta, symbol, info_controller):
         '''买入判断'''
         ml_pred = self.get_ml_prediction(symbol, info_controller)
-        if theta < -1.2 and ml_pred > 0.705:
+
+        logging.info('--------------------judge_buy---------------------------')
+        logging.info("symbol:{}".format(symbol))
+        logging.info("ml_pred:{}".format(ml_pred))
+        logging.info('---------------------------------------------------------')
+
+        if theta < -1.2 and ml_pred > 0.617:
             return True
         else:
             return False
@@ -192,14 +200,15 @@ class Strategy_mean_reversion(StrategyInterface):
 
         current_rtn = (symbol_price - bid_price) / bid_price
 
-        # logging.info('--------------------judge_sell---------------------------')
-        # logging.info("symbol:{}".format(symbol))
-        # logging.info("current_rtn:{}".format(current_rtn))
-        # logging.info('---------------------------------------------------------')
+        logging.info('--------------------judge_sell---------------------------')
+        logging.info("symbol:{}".format(symbol))
+        logging.info("ml_pred:{}".format(ml_pred))
+        logging.info("current_rtn:{}".format(current_rtn))
+        logging.info('---------------------------------------------------------')
 
         if current_rtn < -0.05:  # 止损平仓
             return True
-        elif theta > 1.2 and ml_pred < 0.305:  # 止盈平仓s
+        elif theta > 1.2 and ml_pred < 0.368:  # 止盈平仓s
             return True
         else:
             return False
@@ -213,8 +222,4 @@ class Strategy_mean_reversion(StrategyInterface):
         factor_df = factor_df[self.features_calculator.all_X_cols]
 
         prediction = self.reverse_detector.get_machine_learning_pridictions(factor_df)
-        logging.info('--------------------get_ml_prediction---------------------------')
-        logging.info("symbol:{}".format(symbol))
-        logging.info("prediction:{}".format(prediction))
-        logging.info('---------------------------------------------------------')
         return prediction
