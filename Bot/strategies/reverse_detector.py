@@ -23,7 +23,7 @@ class Reverse_Detector(object):
         return model
 
     def load_xgb_models(self, model_save_path = './models/'):
-        xgb_model = self.read_model(model_save_path, 'best_xgboost_rich_model_1_1.pkl')
+        xgb_model = self.read_model(model_save_path, 'best_xgboost_rich_model_60_full_data.pkl')
         return xgb_model
 
 
