@@ -15,7 +15,7 @@ Research/data/
 __pycache__
 *.pyc
 privateconfig.py
-Bot/privateconfig.py
+Bots/SpotBot/privateconfig.py
 
 ### Other ###
 .DS_Store
