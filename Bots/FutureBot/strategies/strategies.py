@@ -24,7 +24,7 @@ class Strategy_mean_reversion(StrategyInterface):
     '''均值复归策略'''
     def __init__(self):
         super().__init__()
-        self.reverse_detector = reverse_detector.Reverse_Detector(model_save_path='./FutureBot/models/')
+        self.reverse_detector = reverse_detector.Reverse_Detector(model_save_path='/home/ec2-user/HengTrader/Bots/FutureBot/models/')
         self.features_calculator = reverse_detector.Features_Calculator()
 
 
@@ -72,7 +72,7 @@ class Strategy_mean_reversion(StrategyInterface):
         self.features_calculator.save_market_coin_data(data_dict["ETHUSDT"], coin_name="eth")
 
         # 1. 判断是否持有
-        held_set, un_held_set = info_controller.account_inf.get_symbols_held_sets()
+        held_set, un_held_set = info_controller.get_symbols_held_sets()
         for symbol in held_set:  # 对于持有的币种，进行判断是否需要平仓
             temp_order = self.held_set_logic(symbol, info_controller)
             if temp_order:
@@ -177,6 +177,8 @@ class Strategy_mean_reversion(StrategyInterface):
         positionAmt = info_controller.account_info.position_df.loc[symbol, "positionAmt"]
         stepDecimal = info_controller.strategy_info.exchange_info_df.loc[symbol, "quantityPrecision"]
         order.quantity = strategy_utils.np_round_floor(positionAmt, stepDecimal)
+        if order.quantity < 0:
+            order.quantity = -order.quantity
 
         # 判断交易方向，总是和持仓方向相反
         if positionAmt > 0:
@@ -238,7 +240,7 @@ class Strategy_mean_reversion(StrategyInterface):
         logging.info("ml_pred:{}".format(ml_pred))
         logging.info('---------------------------------------------------------')
 
-        if ml_pred > 0.5523:
+        if ml_pred > 0.5532:
             return 'BUY'
         elif ml_pred < 0.4713:
             return 'SELL'

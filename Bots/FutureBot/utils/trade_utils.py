@@ -3,7 +3,7 @@ from binance.error import ClientError
 from binance.spot import Spot as SpotClient
 from binance.um_futures import UMFutures
 from Bots.FutureBot.privateconfig import g_api_key, g_secret_key
-
+from Bots.FutureBot.utils.information import Info_Controller
 
 class Order_Structure(object):
     '''Order的结构体'''
@@ -33,12 +33,12 @@ class Order_Structure(object):
                 assert self.price != 0., 'Order_Structure Error: price is 0, and type is LIMIT'
 
 
-def create_order(trade_client, order_s: Order_Structure, info_controller=None):
+def create_order(trade_client, info_controller:Info_Controller, order_s: Order_Structure,):
     '''接受order structure，创建订单'''
     if not order_s.valid:
         return None
 
-    check_order(trade_client, order_s.symbol)
+    check_order(trade_client, info_controller, order_s.symbol)
 
     params = {
         "symbol": order_s.symbol,
@@ -69,6 +69,7 @@ def create_order(trade_client, order_s: Order_Structure, info_controller=None):
                 error.status_code, error.error_code, error.error_message
             )
         )
+        return None
 
     return response
 
@@ -77,14 +78,52 @@ def cancel_order(trade_client, order_id, symbol):
     pass
 
 
-def check_order(trade_client, symbol): # todo
+def check_order(trade_client, info_controller, symbol):
     '''
     1. 检查是否有未完成的订单
     2. 检查杠杆率是否正常
     3. margin 类应该型是isolated
     '''
-    pass
 
+    # todo 检查是否有未完成的订单
+
+    if info_controller.account_info.position_df.loc[symbol, 'leverage'] != 1:
+        change_leverage(trade_client, symbol)
+
+    if info_controller.account_info.position_df.loc[symbol, 'isolated'] != True:
+        change_margin_type(trade_client, symbol)
+
+    return
+
+def change_leverage(trade_client, symbol):
+    '''调整杠杆率'''
+    try:
+        response = trade_client.change_leverage(
+            symbol=symbol, leverage=1, recvWindow=6000
+        )
+        logging.info(response)
+    except ClientError as error:
+        logging.error(
+            "Found error. status: {}, error code: {}, error message: {}".format(
+                error.status_code, error.error_code, error.error_message
+            )
+        )
+    return
+
+def change_margin_type(trade_client, symbol):
+    '''调整margin type为 isolated'''
+    try:
+        response = trade_client.change_margin_type(
+            symbol=symbol, marginType="ISOLATED", recvWindow=6000
+        )
+        logging.info(response)
+    except ClientError as error:
+        logging.error(
+            "Found error. status: {}, error code: {}, error message: {}".format(
+                error.status_code, error.error_code, error.error_message
+            )
+        )
+    return
 
 if __name__ == "__main__":
     params = {

@@ -1,5 +1,10 @@
 import pandas as pd
 import numpy as np
+
+import sys
+sys.path.append('/home/ec2-user/HengTrader')
+
+
 from Bots.FutureBot.utils.data_utils import get_decimal_precision, seperate_symbol_info_from_dict
 from binance.um_futures import UMFutures
 from Bots.FutureBot.privateconfig import g_api_key, g_secret_key
@@ -31,6 +36,16 @@ class Info_Controller():
         '''
         price_info = self.client.ticker_price(symbol)
         return float(price_info['price'])
+
+    def get_symbols_held_sets(self):
+        '''获取两个列表，分别包含持有和非持有的标的'''
+        held_set = set(self.account_info.position_df[self.account_info.position_df["is_hold"]].index.values)
+        un_held_set = set(self.account_info.position_df[~self.account_info.position_df["is_hold"]].index.values)
+
+        candidate_set = set(self.strategy_info.candidate_symbols)
+        held_set = held_set & candidate_set
+        un_held_set = un_held_set & candidate_set
+        return held_set, un_held_set
 
 
 class Info_Interface():
@@ -117,12 +132,6 @@ class Account_Info(Info_Interface):
 
         self.position_df = position_df
         return
-
-    def get_symbols_held_sets(self):
-        # todo
-        held_set = set(self.position_df[self.position_df["is_hold"]].index.values)
-        un_held_set = set(self.position_df[~self.position_df["is_hold"]].index.values)
-        return held_set, un_held_set
 
 
 class Strategy_Info(Info_Interface):

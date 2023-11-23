@@ -11,7 +11,7 @@ import pickle
 import pandas_ta
 from pandas_ta.core import adx, cci, macd, rsi, obv, vwap
 
-from strategy_utils import X_cols, co_diff_target_cols, all_X_cols, \
+from strategies.strategy_utils import X_cols, co_diff_target_cols, all_X_cols, \
     btc_X_cols, eth_X_cols, co_diff_target_cols_btc, co_diff_target_cols_eth
 
 

@@ -1,6 +1,6 @@
 
 import sys
-# sys.path.append("../..")  # Adds higher directory to python modules path.
+sys.path.append('../')
 from utils.information import Info_Controller
 from utils.data_utils import get_market_prices
 from utils.trade_utils import create_order
@@ -25,7 +25,7 @@ def get_datetime_from_timestamp(timestamp):
 
 def run_trade(config_dict, info_controller, strategy, api_url=None):
     '''运行交易主程序'''
-    client = UMFutures(api_key=g_api_key, api_secret=g_secret_key, base_url=api_url)
+    client = UMFutures(key=g_api_key, secret=g_secret_key)
 
     # 1. 更新信息
     info_controller.update_info_all(client)  # 更新账户信息，主要是用新的持仓情况更新position_df
@@ -52,7 +52,7 @@ def run_trade(config_dict, info_controller, strategy, api_url=None):
     order_s_list = strategy.get_order_list(info_controller, target_position=config_dict["fraction"])
 
     for order_s in order_s_list:
-        order_id = create_order(info_controller, client, order_s)
+        order_id = create_order(client, info_controller, order_s)
         print(order_id)
 
     return
@@ -87,26 +87,52 @@ def before_start(config_dict, api_url=None):
 
 if __name__ == "__main__":
     util_config = dict(
-        candidate_symbols= ['TRBUSDT', 'CREAMUSDT', 'QNTUSDT', 'MLNUSDT', 'KP3RUSDT', 'AAVEUSDT', 
-        'ALCXUSDT', 'GMXUSDT', 'COMPUSDT', 'LTCUSDT', 'EGLDUSDT', 'AUCTIONUSDT', 'ZECUSDT', 'LINKUSDT', 
-        'DASHUSDT', 'ANTUSDT', 'FXSUSDT', 'SOLUSDT', 'APTUSDT', 'SSVUSDT', 'UNFIUSDT', 'MOVRUSDT', 
-        'MULTIUSDT', 'WINGUSDT', 'NEOUSDT', 'XVSUSDT', 'INJUSDT', 'ETCUSDT', 'CVXUSDT', 'AVAXUSDT', 
-        'OGUSDT', 'AXSUSDT', 'LPTUSDT', 'WLDUSDT', 'FTTUSDT', 'ATOMUSDT', 'CYBERUSDT', 'SNXUSDT', 
-        'FORTHUSDT', 'MASKUSDT', 'FRONTUSDT', 'PYRUSDT', 'RNDRUSDT', 'ARKUSDT', 'BONDUSDT', 'GLMRUSDT', 
-        'KNCUSDT', 'UNIUSDT', 'LUNAUSDT', 'AGLDUSDT', 'MTLUSDT', 'RUNEUSDT', 'HIFIUSDT', 'ICPUSDT', 
-        'STORJUSDT', 'BELUSDT', 'FILUSDT', 'IMXUSDT', 'DOTUSDT', 'CRVUSDT', 'LQTYUSDT', 'WAVESUSDT', 
-        'TOMOUSDT', 'MCUSDT', 'HIGHUSDT', 'GALUSDT', 'API3USDT', 'OPUSDT', 'DYDXUSDT', 'FISUSDT', 
-        'HOOKUSDT', 'FLMUSDT', 'COMBOUSDT', 'PENDLEUSDT', 'THETAUSDT', 'PHBUSDT', 'NEARUSDT', 
-        'LOOMUSDT', 'SUSHIUSDT', 'LDOUSDT', 'GTCUSDT', 'WTCUSDT', 'ARBUSDT', 'PNTUSDT', 'MAGICUSDT', 
-        'POLSUSDT', 'EDUUSDT', 'CELOUSDT', 'BURGERUSDT', 
-        'SXPUSDT', 'ARKMUSDT', 'APEUSDT', 'BLZUSDT', 'YGGUSDT', 'LITUSDT', 'EOSUSDT', 'CAKEUSDT', 
-        'PROSUSDT', 'STGUSDT', 'STXUSDT', 'PERPUSDT', 'PHAUSDT', 'RDNTUSDT', 'XRPUSDT', 'STPTUSDT', 
-        'DREPUSDT', 'MAVUSDT', 'ONTUSDT', 'OCEANUSDT', 'ELFUSDT', 'OAXUSDT', 'MATICUSDT', 'SYNUSDT', 
-        'MINAUSDT', 'KAVAUSDT', '1INCHUSDT', 'GFTUSDT', 'SUIUSDT', 'FETUSDT', 'ENJUSDT', 'C98USDT', 
-        'FLOWUSDT', 'FIDAUSDT', 'EURUSDT', 'ZRXUSDT', 'HARDUSDT', 'SEIUSDT', 'ALGOUSDT', 'MANAUSDT', 
-        'SANDUSDT', 'JOEUSDT', 'BSWUSDT', 'ATAUSDT', 'BAKEUSDT', 'QUICKUSDT', 'IDUSDT', 'AGIXUSDT', 
-        'CFXUSDT', 'KLAYUSDT', 'DUSKUSDT', 'DARUSDT', 'OGNUSDT', 'GMTUSDT', 'ASTRUSDT', 'XLMUSDT', 
-        'TRUUSDT', 'WOOUSDT', 'ACAUSDT', 'FTMUSDT', 'ADAUSDT'],
+        candidate_symbols= ['BTCUSDT', 'ETHUSDT', 'BCHUSDT', 'XRPUSDT', 'EOSUSDT', 'LTCUSDT',
+       'TRXUSDT', 'ETCUSDT', 'LINKUSDT', 'XLMUSDT', 'ADAUSDT', 'XMRUSDT',
+       'DASHUSDT', 'ZECUSDT', 'XTZUSDT', 'BNBUSDT', 'ATOMUSDT', 'ONTUSDT',
+       'IOTAUSDT', 'BATUSDT', 'VETUSDT', 'NEOUSDT', 'QTUMUSDT',
+       'IOSTUSDT', 'THETAUSDT', 'ALGOUSDT', 'ZILUSDT', 'KNCUSDT',
+       'ZRXUSDT', 'COMPUSDT', 'OMGUSDT', 'DOGEUSDT', 'SXPUSDT',
+       'KAVAUSDT', 'BANDUSDT', 'RLCUSDT', 'WAVESUSDT', 'MKRUSDT',
+       'SNXUSDT', 'DOTUSDT', 'DEFIUSDT', 'YFIUSDT', 'BALUSDT', 'CRVUSDT',
+       'TRBUSDT', 'RUNEUSDT', 'SUSHIUSDT', 'EGLDUSDT', 'SOLUSDT',
+       'ICXUSDT', 'STORJUSDT', 'BLZUSDT', 'UNIUSDT', 'AVAXUSDT',
+       'FTMUSDT', 'ENJUSDT', 'FLMUSDT', 'RENUSDT', 'KSMUSDT', 'NEARUSDT',
+       'AAVEUSDT', 'FILUSDT', 'RSRUSDT', 'LRCUSDT', 'MATICUSDT',
+       'OCEANUSDT', 'BELUSDT', 'CTKUSDT', 'AXSUSDT', 'ALPHAUSDT',
+       'ZENUSDT', 'SKLUSDT', 'GRTUSDT', '1INCHUSDT', 'CHZUSDT',
+       'SANDUSDT', 'ANKRUSDT', 'LITUSDT', 'UNFIUSDT', 'REEFUSDT',
+       'RVNUSDT', 'SFPUSDT', 'XEMUSDT', 'COTIUSDT', 'CHRUSDT', 'MANAUSDT',
+       'ALICEUSDT', 'HBARUSDT', 'ONEUSDT', 'LINAUSDT', 'STMXUSDT',
+       'DENTUSDT', 'CELRUSDT', 'HOTUSDT', 'MTLUSDT', 'OGNUSDT', 'NKNUSDT',
+       'DGBUSDT', '1000SHIBUSDT', 'BAKEUSDT', 'GTCUSDT', 'BTCDOMUSDT',
+       'IOTXUSDT', 'AUDIOUSDT', 'C98USDT', 'MASKUSDT', 'ATAUSDT',
+       'DYDXUSDT', '1000XECUSDT', 'GALAUSDT', 'CELOUSDT', 'ARUSDT',
+       'KLAYUSDT', 'ARPAUSDT', 'CTSIUSDT', 'LPTUSDT', 'ENSUSDT',
+       'PEOPLEUSDT', 'ANTUSDT', 'ROSEUSDT', 'DUSKUSDT', 'FLOWUSDT',
+       'IMXUSDT', 'API3USDT', 'GMTUSDT', 'APEUSDT', 'WOOUSDT',
+       'JASMYUSDT', 'DARUSDT', 'GALUSDT', 'OPUSDT', 'INJUSDT', 'STGUSDT',
+       'FOOTBALLUSDT', 'SPELLUSDT', '1000LUNCUSDT', 'LUNA2USDT',
+       'LDOUSDT', 'CVXUSDT', 'ICPUSDT', 'APTUSDT', 'QNTUSDT',
+       'BLUEBIRDUSDT', 'FETUSDT', 'FXSUSDT', 'HOOKUSDT', 'MAGICUSDT',
+       'TUSDT', 'RNDRUSDT', 'HIGHUSDT', 'MINAUSDT', 'ASTRUSDT',
+       'AGIXUSDT', 'PHBUSDT', 'GMXUSDT', 'CFXUSDT', 'STXUSDT', 'BNXUSDT',
+       'ACHUSDT', 'SSVUSDT', 'CKBUSDT', 'PERPUSDT', 'TRUUSDT', 'LQTYUSDT',
+       'USDCUSDT', 'IDUSDT', 'ARBUSDT', 'JOEUSDT', 'TLMUSDT', 'AMBUSDT',
+       'LEVERUSDT', 'RDNTUSDT', 'HFTUSDT', 'XVSUSDT', 'BLURUSDT',
+       'EDUUSDT', 'IDEXUSDT', 'SUIUSDT', '1000PEPEUSDT', '1000FLOKIUSDT',
+       'UMAUSDT', 'RADUSDT', 'KEYUSDT', 'COMBOUSDT', 'NMRUSDT', 'MAVUSDT',
+       'MDTUSDT', 'XVGUSDT', 'WLDUSDT', 'PENDLEUSDT', 'ARKMUSDT',
+       'AGLDUSDT', 'YGGUSDT', 'DODOXUSDT', 'BNTUSDT', 'OXTUSDT',
+       'SEIUSDT', 'BTCUSDT_231229', 'ETHUSDT_231229', 'CYBERUSDT',
+       'HIFIUSDT', 'ARKUSDT', 'FRONTUSDT', 'GLMRUSDT', 'BICOUSDT',
+       'BTCUSDT_240329', 'ETHUSDT_240329', 'STRAXUSDT', 'LOOMUSDT',
+       'BIGTIMEUSDT', 'BONDUSDT', 'ORBSUSDT', 'STPTUSDT', 'WAXPUSDT',
+       'BSVUSDT', 'RIFUSDT', 'POLYXUSDT', 'GASUSDT', 'POWRUSDT',
+       'SLPUSDT', 'TIAUSDT', 'SNTUSDT', 'CAKEUSDT', 'MEMEUSDT', 'TWTUSDT',
+       'TOKENUSDT', 'ORDIUSDT', 'STEEMUSDT', 'BADGERUSDT', 'ILVUSDT',
+       'NTRNUSDT', 'MBLUSDT', 'KASUSDT', 'BEAMXUSDT', '1000BONKUSDT',
+       'PYTHUSDT'],
         quote_currency='usdt',
     )
 
