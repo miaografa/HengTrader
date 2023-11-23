@@ -2,11 +2,10 @@ import pandas as pd
 import numpy as np
 import logging
 # sys.path.append("../")
-
-from Bots.SpotBot.utils.trade_utils import Order_Structure
 from . import reverse_detector
 from . import strategy_utils
-
+from Bots.FutureBot.utils.trade_utils import Order_Structure
+from Bots.FutureBot.utils.information import Info_Controller
 
 
 class StrategyInterface(object):
@@ -21,12 +20,11 @@ class StrategyInterface(object):
         pass
 
 
-
 class Strategy_mean_reversion(StrategyInterface):
     '''均值复归策略'''
     def __init__(self):
         super().__init__()
-        self.reverse_detector = reverse_detector.Reverse_Detector(model_save_path='./SpotBot/models/')
+        self.reverse_detector = reverse_detector.Reverse_Detector(model_save_path='./FutureBot/models/')
         self.features_calculator = reverse_detector.Features_Calculator()
 
 
@@ -51,133 +49,188 @@ class Strategy_mean_reversion(StrategyInterface):
         data_dict = info_controller.strategy_info.price_dict
         candidate_symbols = info_controller.strategy_info.candidate_symbols
 
+        # 1. 更新theta信息
         for symbol in candidate_symbols:
             data_df = data_dict[symbol]
             theta = self.get_theta(data_df)
-            info_controller.strategy_info.theta_info_df.loc[symbol,"theta"] = np.round(theta,4)
-
-        # 1. 买入逻辑
-        # 先判断是否持仓
-        held_set, unheld_set = info_controller.account_info.get_symbols_held_sets()
-
-        info_controller.strategy_info.theta_info_df["is_hold"] = False
-        for symbol in candidate_symbols:
-            if symbol in held_set:
-                info_controller.strategy_info.theta_info_df.loc[symbol, "is_hold"] = True
-            else:
-                info_controller.strategy_info.theta_info_df.loc[symbol, "is_hold"] = False
+            info_controller.strategy_info.exchange_info_df.loc[symbol,"theta"] = np.round(theta,4)
 
         return info_controller
 
-    def get_order_list(self, info_controller, target_position=1.):
+
+    def get_order_list(self, info_controller:Info_Controller, target_position=1.):
 
         order_list = []
         # 1. 更新 inforcontroller 的 ishold 信息
         info_controller = self.update_info(info_controller)
 
         data_dict = info_controller.strategy_info.price_dict
-        theta_info_df = info_controller.strategy_info.theta_info_df
+        exchange_info_df = info_controller.strategy_info.exchange_info_df
 
         # 2. 更新并且记录btc 和 eth的features
         self.features_calculator.save_market_coin_data(data_dict["BTCUSDT"], coin_name="btc")
         self.features_calculator.save_market_coin_data(data_dict["ETHUSDT"], coin_name="eth")
 
-        unhold_currency_df = theta_info_df[theta_info_df["is_hold"] == False]
-        unhold_currency_df = unhold_currency_df.sort_values(by="theta", ascending=True)  # 用theta进行排序
-        # 1. 选择theta较小的coin 作为交易对象
-        logging.info("unhold_currency_df:{}".format(unhold_currency_df))
-        target_unhold_currency_df = unhold_currency_df[unhold_currency_df["theta"] < -1.2]
-        logging.info("target_unhold_currency_df:{}".format(target_unhold_currency_df.index))
-        for target_symbol in target_unhold_currency_df.index:
-            target_symbol_price = data_dict[target_symbol]['close'].values[-1]
-            order = self.get_buy_order(target_symbol, unhold_currency_df.loc[target_symbol, "theta"],
-                                   target_position, symbol_price=target_symbol_price, info_controller=info_controller)
-            order_list.append(order)
-        order = None
+        # 1. 判断是否持有
+        held_set, un_held_set = info_controller.account_inf.get_symbols_held_sets()
+        for symbol in held_set:  # 对于持有的币种，进行判断是否需要平仓
+            temp_order = self.held_set_logic(symbol, info_controller)
+            if temp_order:
+                order_list.append(temp_order)
 
-        # 2. 卖出逻辑
-        hold_currency_df = theta_info_df[theta_info_df["is_hold"] == True]
-
-        if len(hold_currency_df):  # 如果有持仓，对于所有持仓的进行判断是否需要出售
-            for target_symbol in hold_currency_df.index:
-                target_symbol_price = data_dict[target_symbol]['close'].values[-1]
-                order = self.get_sell_order(target_symbol, hold_currency_df.loc[target_symbol, "theta"],
-                                       target_position, symbol_price=target_symbol_price, info_controller=info_controller)
-                order_list.append(order)
-                order = None
+        for symbol in un_held_set: # 对于未持有的币种，进行判断是否需要开仓
+            temp_order = self.un_held_set_logic(symbol, info_controller)
+            if temp_order:
+                order_list.append(temp_order)
 
         return order_list
 
 
-    def get_buy_order(self, symbol, theta, target_position, symbol_price, info_controller):
+    def held_set_logic(self, symbol, info_controller:Info_Controller):
         '''
-            买入逻辑
-            包括买入判断和买入量的计算
+        对于持有的币种，进行判断是否需要平仓
+        1. 判断止损
+        2. 判断theta
+
+        return order
+        '''
+        # 1. 判断是否需要止损
+        unrealizedProfit = info_controller.account_info.position_df.loc[symbol, "unrealizedProfit"]
+        if unrealizedProfit < -0.05:  # todo 加入设置中
+            order = self.get_close_order(symbol, info_controller=info_controller)
+            return order
+
+        # 2. 判断theta
+        theta = info_controller.strategy_info.exchange_info_df.loc[symbol,"theta"]
+        if np.abs(theta) > 1.4:
+            # 结合机器学习，判断是否需要平仓
+            judge_close = self.judge_close(symbol, info_controller)
+            if judge_close:
+                order = self.get_close_order(symbol, info_controller=info_controller)
+                return order
+            else:
+                return None
+        else:
+            return None
+
+
+    def un_held_set_logic(self, symbol, info_controller):
+        '''
+        未持有的币种，进行判断是否需要开仓
+        '''
+        # 1. 判断theta
+        theta = info_controller.strategy_info.exchange_info_df.loc[symbol, "theta"]
+        if np.abs(theta) > 1.4:
+            # 结合机器学习，判断是否需要开仓
+            side = self.judge_open_side(symbol, info_controller)
+            if side == 'HOLD':
+                return None
+            else:
+                order = self.get_open_order(symbol, side=side, info_controller=info_controller)
+                return order
+        else:
+            return None
+
+
+    def get_open_order(self, symbol, side, info_controller):
+        '''
+            开仓逻辑，由ml判断是否开仓，以及开仓的方向
             return order
         '''
-        order = Order_Structure()
-        order.symbol = symbol
-
-        is_buy = self.judge_buy(theta, symbol, info_controller)  # 买入逻辑
-        if is_buy:
-            order.direction = 'buy'
-        else:
-            order.direction = 'hold'
-
-        # 计算买入量
-        if order.direction == 'buy':  # buy base currency
+        def cal_buy_quantity(info_controller, price):
+            '''
+            计算买入量
+            '''
             balance = info_controller.account_info.USDT_value
             if balance > 100:
-                order.amount = 50.
+                quantity = 50. / price
             elif balance > 50:
-                order.amount = 20.
+                quantity = 20. / price
             else:
-                order.amount = 0.
-                order.direction = 'hold'  # Too little cash to buy anything
+                quantity = 0.
+            return quantity
 
-            order.amount = strategy_utils.np_round_floor(order.amount, 4)  # devided by the price!!!
-
-            logging.info('--------------------------------------------------------')
-            logging.info("order.symbol:{}".format(order.symbol))
-            logging.info("target_position:{}".format(target_position))
-            logging.info("balance:{}".format(balance))
-            logging.info("balance * target_position:{}".format(balance * target_position))
-            logging.info("symbol_price: {}".format(symbol_price))
-            logging.info('--------------------------------------------------------')
-
-        elif order.direction == 'hold':  # buy base currency
-            order.amount = 0
+        order = Order_Structure()
+        order.symbol = symbol
+        order.side = side
+        # 获取挂单价格 price
+        order.price = info_controller.get_price_now(symbol)
+        # 计算买入量 quantity
+        quantity = cal_buy_quantity(info_controller, order.price)
+        if quantity == 0:
+            return None
+        # 保留小数点位数
+        stepDecimal = info_controller.strategy_info.exchange_info_df.loc[symbol, "quantityPrecision"]
+        order.quantity = strategy_utils.np_round_floor(quantity, stepDecimal)
 
         return order
 
 
-    def get_sell_order(self, symbol, theta, target_position, symbol_price, info_controller):
+    def get_close_order(self, symbol, info_controller):
         '''
-        当前版本target_position 没有用到
+            close 平仓。
+            交易方向总是和持仓方向相反
         '''
         order = Order_Structure()
         order.symbol = symbol
-        # 判断交易方向
-        bid_price = info_controller.account_info.position_df.loc[symbol, "bid_price"]
-        is_sell = self.judge_sell(symbol, theta, symbol_price, bid_price, info_controller)  # 卖出逻辑
-        if is_sell:
-            order.direction = 'sell'
-        else:
-            order.direction = 'hold'
 
-        if order.direction == 'sell':  # sell base currency
-            order.amount = info_controller.account_info.position_df.loc[symbol, "free"]
-            stepDecimal = info_controller.strategy_info.theta_info_df.loc[symbol,"stepDecimal"]
-            order.amount = strategy_utils.np_round_floor(order.amount, stepDecimal)
+        positionAmt = info_controller.account_info.position_df.loc[symbol, "positionAmt"]
+        stepDecimal = info_controller.strategy_info.exchange_info_df.loc[symbol, "quantityPrecision"]
+        order.quantity = strategy_utils.np_round_floor(positionAmt, stepDecimal)
 
-        elif order.direction == 'hold':  # buy base currency
-            order.amount = 0
+        # 判断交易方向，总是和持仓方向相反
+        if positionAmt > 0:
+            order.side = 'SELL'
+        elif positionAmt < 0:
+            order.side = 'BUY'
+
+        # 获取挂单价格
+        order.price = info_controller.get_price_now(symbol)
+
+        try:
+            order.selfcheck()
+        except AssertionError as e:
+            logging.info('-----------------AssertionError-----------------------')
+            logging.info(f"AssertionError:{e}".format(order.symbol))
+            logging.info('------------------------------------------------------')
+            return None
 
         return order
 
 
-    def judge_buy(self, theta, symbol, info_controller):
-        '''买入判断'''
+    def judge_open_side(self, symbol, info_controller) -> str:
+        '''
+        判断是否需要开仓
+        return side
+            - 'BUY'
+            - 'SELL'
+            - 'HOLD'
+        '''
+        side = self.get_ml_trade_derection(symbol, info_controller)
+        return side
+
+
+    def judge_close(self, symbol, info_controller) -> bool:
+        '''
+        判断是否需要平仓
+        '''
+        side = self.get_ml_trade_derection(symbol, info_controller)
+        if side == 'HOLD':
+            return False
+        else:
+            positionAmt = info_controller.account_info.position_df.loc[symbol, "positionAmt"]
+            if side == 'SELL' and positionAmt > 0:  # 持多仓且模型预测结果为卖出
+                return True
+            elif side == 'BUY' and positionAmt < 0:  # 持空仓且模型预测结果为买入
+                return True
+            else:
+                return False
+
+
+    def get_ml_trade_derection(self, symbol, info_controller):
+        '''
+        由机器学习判断交易方向
+        '''
         ml_pred = self.get_ml_prediction(symbol, info_controller)
 
         logging.info('--------------------judge_buy---------------------------')
@@ -185,38 +238,18 @@ class Strategy_mean_reversion(StrategyInterface):
         logging.info("ml_pred:{}".format(ml_pred))
         logging.info('---------------------------------------------------------')
 
-        if theta < -1.2 and ml_pred > 0.617:
-            return True
+        if ml_pred > 0.5523:
+            return 'BUY'
+        elif ml_pred < 0.4713:
+            return 'SELL'
         else:
-            return False
-
-
-    def judge_sell(self, symbol, theta, symbol_price, bid_price, info_controller):
-        '''卖出判断'''
-        ml_pred = self.get_ml_prediction(symbol, info_controller)
-
-        current_rtn = (symbol_price - bid_price) / bid_price
-
-        logging.info('--------------------judge_sell---------------------------')
-        logging.info("symbol:{}".format(symbol))
-        logging.info("ml_pred:{}".format(ml_pred))
-        logging.info("current_rtn:{}".format(current_rtn))
-        logging.info('---------------------------------------------------------')
-
-        if current_rtn < -0.05:  # 止损平仓
-            return True
-        elif theta > 1.2 and ml_pred < 0.368:  # 止盈平仓s
-            return True
-        else:
-            return False
+            return "HOLD"
 
 
     def get_ml_prediction(self, symbol, info_controller):
-
+        '''获取机器学习的预测结果'''
         price_df = info_controller.strategy_info.price_dict[symbol]
-
         factor_df = self.features_calculator.get_all_features_add_market_coin(price_df)
         factor_df = factor_df[self.features_calculator.all_X_cols]
-
         prediction = self.reverse_detector.get_machine_learning_pridictions(factor_df)
         return prediction

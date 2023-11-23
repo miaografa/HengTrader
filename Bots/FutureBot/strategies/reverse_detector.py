@@ -27,7 +27,7 @@ class Reverse_Detector(object):
         return model
 
     def load_xgb_models(self, model_save_path = './models/'):
-        xgb_model = self.read_model(model_save_path, 'best_xgboost_rich_model_60_full_data.pkl')
+        xgb_model = self.read_model(model_save_path, 'best_xgboost_10_2023.pkl')
         return xgb_model
 
 
@@ -292,7 +292,7 @@ if __name__ == '__main__':
 
 
     # # 测试预测部分
-    # model_save_path = '../models/'
-    # r_d = Reverse_Detector(model_save_path)
-    # y_predict = r_d.get_machine_learning_pridictions(factor_df)
-    # print(y_predict)
+    model_save_path = '../models/'
+    r_d = Reverse_Detector(model_save_path)
+    y_predict = r_d.get_machine_learning_pridictions(factor_df)
+    print(y_predict)

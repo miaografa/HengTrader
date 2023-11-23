@@ -1,4 +1,3 @@
-from binance.spot import Spot as SpotClient
 
 import sys
 # sys.path.append("../..")  # Adds higher directory to python modules path.
@@ -6,8 +5,9 @@ from utils.information import Info_Controller
 from utils.data_utils import get_market_prices
 from utils.trade_utils import create_order
 from strategies.strategies import *
+from binance.um_futures import UMFutures
+from Bots.FutureBot.privateconfig import g_api_key, g_secret_key
 
-from privateconfig import *  # import the api keys
 
 import pandas as pd
 import time
@@ -23,9 +23,9 @@ def get_datetime_from_timestamp(timestamp):
     return pd.to_datetime(timestamp, utc=True, unit='ms')
 
 
-def run_trade(config_dict, info_controller, strategy, api_url):
+def run_trade(config_dict, info_controller, strategy, api_url=None):
     '''运行交易主程序'''
-    client = SpotClient(api_key=g_api_key, api_secret=g_secret_key, base_url=api_url)
+    client = UMFutures(api_key=g_api_key, api_secret=g_secret_key, base_url=api_url)
 
     # 1. 更新信息
     info_controller.update_info_all(client)  # 更新账户信息，主要是用新的持仓情况更新position_df
@@ -58,18 +58,16 @@ def run_trade(config_dict, info_controller, strategy, api_url):
     return
 
 
-def before_start(config_dict, api_url):
+def before_start(config_dict, api_url=None):
     '''
     交易开始前运行的函数
     会自动修改config_dict的内容
     '''
     # 1. 初始化config_dict
 
-    client = SpotClient(api_key=g_api_key,
-                        api_secret=g_secret_key,
-                        base_url=api_url)
+    client = UMFutures(key=g_api_key, secret=g_secret_key)
 
-    # 1. 获取账号信息
+    # 1. 初始化infoController
     for i in range(5):
         try:
             info_controller = Info_Controller(config_dict, client)
@@ -121,28 +119,16 @@ if __name__ == "__main__":
     config_dict.update(util_config)
     config_dict.update(strategy_config)
 
-    API_urls = ["https://api.binance.com",
-                "https://api-gcp.binance.com",
-                "https://api1.binance.com",
-                "https://api2.binance.com",
-                "https://api3.binance.com",
-                "https://api4.binance.com"]
-    
-    api_url = API_urls[0]  # 初始化api_url
-    config_dict, info_controller, strategy = before_start(config_dict, api_url)
+    config_dict, info_controller, strategy = before_start(config_dict)
 
     while True:
-        i = 0
         try:
-            api_url = API_urls[i%6]
             time.sleep(1.)
-            run_trade(config_dict, info_controller, strategy, api_url)
+            run_trade(config_dict, info_controller, strategy)
             print("执行完毕")
             time.sleep(480.)
         except:
-            api_url = API_urls[i%6]
-            config_dict, my_spot_account_s, strategy = before_start(config_dict, api_url)
-            i += 1
+            config_dict, my_spot_account_s, strategy = before_start(config_dict)
             continue
 
 

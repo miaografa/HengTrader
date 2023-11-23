@@ -10,7 +10,6 @@ def get_market_prices(symbol:str, interval):
     k_line_cols = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_volume', 'count',
                    'taker_buy_volume', 'taker_buy_quote_volume', 'ignore']
 
-
     price_df.columns = k_line_cols
 
     # 格式转换
@@ -26,8 +25,6 @@ def get_market_prices(symbol:str, interval):
     return price_df
 
 
-
-
 def get_decimal_precision(number_str):
     # 判断是否有小数部分
     if '.' in number_str:
@@ -39,6 +36,24 @@ def get_decimal_precision(number_str):
         # 没有小数部分，精度为0
         return 0
 
+
+def seperate_symbol_info_from_dict(symbol_info: dict):
+    '''工具函数从一个字典分分离出一个子字典'''
+    output_dict = dict()
+    target_cols = [
+        'symbol',
+        'pair',
+        'contractType',
+        'status',
+        'baseAsset',
+        'quoteAsset',
+        'pricePrecision',
+        'quantityPrecision',
+    ]
+    for col in target_cols:
+        output_dict[col] = symbol_info[col]
+
+    return output_dict
 
 
 if __name__ == "__main__":

@@ -1,15 +1,15 @@
 import pandas as pd
-from binance.spot import Spot as SpotClient
-
-from Bots.SpotBot.utils.data_utils import get_decimal_precision
-from privateconfig import *
+import numpy as np
+from Bots.FutureBot.utils.data_utils import get_decimal_precision, seperate_symbol_info_from_dict
+from binance.um_futures import UMFutures
+from Bots.FutureBot.privateconfig import g_api_key, g_secret_key
 
 
 class Info_Controller():
     '''信息控制器'''
     def __init__(self, config_dict, client, use_strategy=True):
+        self.client = client
         self.use_strategy = use_strategy
-
         self.account_info = Account_Info(config_dict)
         if self.use_strategy:
             self.strategy_info = Strategy_Info(config_dict)
@@ -24,6 +24,13 @@ class Info_Controller():
         self.account_info.update_info(client)
         if self.use_strategy:
             self.strategy_info.update_info(client)
+
+    def get_price_now(self, symbol):
+        '''
+        获取价格信息
+        '''
+        price_info = self.client.ticker_price(symbol)
+        return float(price_info['price'])
 
 
 class Info_Interface():
@@ -55,46 +62,29 @@ class Account_Info(Info_Interface):
             2. init "is_hold"
             3. init "bid_price" for the holds
         '''
-        account_infomation = client.account()  # Get account info
+        account:dict = client.account()  # Get account info
 
-        # account balances info
-        position_df = pd.DataFrame(account_infomation['balances'])
-        self.USDT_value = float(position_df[position_df["asset"] == "USDT"]['free'].values[0])
+        # 1. USDT value
+        self.USDT_value = float(account['availableBalance'])
+        self.account_value = account['totalWalletBalance']  # 账户价值
 
-        # Get acg price of "XXXUSDT"
-        # Get all real market symbols
-        exchange_dict = client.exchange_info()
-        temp = exchange_dict['symbols']
-        market_symbols = set([symbol_dict['symbol'] for symbol_dict in temp])
-
-        # 只需要对应有USDT交易对的即可
-        # 此处实际上得到了全部的持仓信息，包括了不在候选交易对中的
-        fake_symbols = [x + 'USDT' for x in position_df['asset'].values]
-        position_df['symbol'] = fake_symbols
-        is_symbol_exist = [True if x in market_symbols else False for x in fake_symbols]
-        exist_symbols = list(position_df[is_symbol_exist].symbol.values)  # all symbol with USDT and Exsit
-        position_df = position_df[is_symbol_exist]
-
-        price_df = pd.DataFrame(client.ticker_price(symbols=exist_symbols))
-        position_df = pd.merge(position_df, price_df, on='symbol', how='left')
+        # 2. account position info
+        position_df = pd.DataFrame(account['positions'])
         position_df.set_index('symbol', inplace=True, drop=True)
 
         # 格式转换
-        convert_dict = {'free': float,
-                        'locked': float,
-                        'price': float,
+        convert_dict = {
+            'unrealizedProfit': float,
+            'leverage': float,
+            'entryPrice': float,
+            'positionAmt': float,
                         }
+
         position_df = position_df.astype(convert_dict)
         # 计算是否已经持仓
-        position_df["balance"] = position_df["free"] * position_df["price"]
-        position_df["is_hold"] = position_df["balance"] > 5
-        # 用当前价格，初始化已经持仓的成本价。"bid_price"
-        position_df["bid_price"] = 0.001
-        condition = position_df["is_hold"]
-        position_df.loc[condition, "bid_price"] = position_df.loc[condition, "price"]
+        position_df["is_hold"] = np.where(np.abs(position_df['positionAmt']) > 0, True, False)
 
         self.position_df = position_df
-        self.account_value = self.position_df["balance"].sum()
 
         return
 
@@ -103,39 +93,33 @@ class Account_Info(Info_Interface):
         '''
         update free, locked value
         '''
-        position_df = self.position_df
+        account: dict = client.account()  # Get account info
 
-        account_infomation = client.account()  # Get new account info
-        new_position_df = pd.DataFrame(account_infomation['balances'])
-        # update USDT_value
-        self.USDT_value = float(new_position_df[new_position_df["asset"] == "USDT"]['free'].values[0])
+        # 1. USDT value
+        self.USDT_value = float(account['availableBalance'])
+        self.account_value = account['totalWalletBalance']  # 账户价值
 
-
-        position_df.drop(columns=["free", "locked", "price", "balance", "is_hold"], inplace=True)
-        position_df.reset_index(inplace=True)
-        position_df = pd.merge(position_df, new_position_df, on="asset", how='left')
-        position_df.set_index('symbol', inplace=True, drop=True)
-
-        # 更新价格
-        price_df = pd.DataFrame(client.ticker_price(symbols=list(position_df.index.values)))
-        position_df = pd.merge(position_df, price_df, left_index=True, right_on='symbol', how='left')
+        # 2. account position info
+        position_df = pd.DataFrame(account['positions'])
         position_df.set_index('symbol', inplace=True, drop=True)
 
         # 格式转换
-        convert_dict = {'free': float,
-                        'locked': float,
-                        'price': float,
-                        }
+        convert_dict = {
+            'unrealizedProfit': float,
+            'leverage': float,
+            'entryPrice': float,
+            'positionAmt': float,
+        }
+
         position_df = position_df.astype(convert_dict)
         # 计算是否已经持仓
-        position_df["balance"] = position_df["free"] * position_df["price"]
-        position_df["is_hold"] = position_df["balance"] > 5
+        position_df["is_hold"] = np.where(np.abs(position_df['positionAmt']) > 0, True, False)
 
         self.position_df = position_df
-        self.account_value = self.position_df["balance"].sum()     #  更新account_value
         return
 
     def get_symbols_held_sets(self):
+        # todo
         held_set = set(self.position_df[self.position_df["is_hold"]].index.values)
         un_held_set = set(self.position_df[~self.position_df["is_hold"]].index.values)
         return held_set, un_held_set
@@ -148,6 +132,9 @@ class Strategy_Info(Info_Interface):
         self.quote_currency = config_dict['quote_currency']
         self.candidate_symbols = config_dict['candidate_symbols']
         self.base_currencies = [x[:-4] for x in config_dict['candidate_symbols']]
+        # 改成大写
+        self.candidate_symbols = [x.upper() for x in self.candidate_symbols]
+        self.base_currencies = [x.upper() for x in self.base_currencies]
         return
 
 
@@ -160,35 +147,50 @@ class Strategy_Info(Info_Interface):
         self.price_dict:
             {symbol: price_df}
         '''
+        self.exchange_info_df = self.update_market_info(client)
         self.check_symbols(client)
-        self.theta_info_df = pd.DataFrame({'symbol': self.candidate_symbols})  # theta_info_df
-        self.theta_info_df['theta'] = 0.001
-        self.theta_info_df.set_index('symbol', inplace=True, drop=True)
-        self.get_trade_decimal_precision(client)  # 获取每个交易对支持的交易精度，加入到theta_info_df["stepDecimal"]
-
+        self.exchange_info_df['theta'] = 0.001
         self.price_dict = dict()  # price_dict
         return
 
 
+    def update_market_info(self, client):
+        '''
+        更新市场信息
+        '''
+        exchange_info = client.exchange_info()
+        exchange_info_df = pd.DataFrame([seperate_symbol_info_from_dict(x) for x in exchange_info['symbols']])
+        exchange_info_df.set_index('symbol', inplace=True)
+        exchange_info_df = exchange_info_df[exchange_info_df['quoteAsset'] == 'USDT']
+        exchange_info_df = exchange_info_df[exchange_info_df['status'] == 'TRADING']
+        return exchange_info_df
+
+
     def check_symbols(self, client):
         '''
-        检查候选的交易对是否存在于市场交易对象中
+        检查候选的交易对是否存在于市场交易对象中, 剔除不在市场交易对中的交易对
+            self.candidate_symbols
+            self.base_currencies
+        reuturn:None
+
         '''
-        self.candidate_symbols = [x.upper() for x in self.candidate_symbols]
-        self.base_currencies = [x.upper() for x in self.base_currencies]
+        market_symbols = set(self.exchange_info_df.index.values)
+        remove_symbols = []
 
-        exchange_dict = client.exchange_info()
-        market_symbols = set([symbol_dict['symbol'] for symbol_dict in exchange_dict['symbols']])
-
+        # 检查候选的交易对是否存在于市场交易对象中
         symbol_in_market = True
         for symbol in self.candidate_symbols:
             if symbol not in market_symbols:
                 print(f"Warning: {symbol} is not in market_symbols")
-                self.candidate_symbols.remove(symbol)
+                remove_symbols.append(symbol)
                 symbol_in_market = False
                 continue
         if symbol_in_market:
             print("All candidate symbols are in market_symbols")
+        else:
+            for symbol in remove_symbols:
+                self.candidate_symbols.remove(symbol)
+                self.base_currencies.remove(symbol[:-4])
         return
 
 
@@ -197,30 +199,11 @@ class Strategy_Info(Info_Interface):
         return
 
 
-    def get_trade_decimal_precision(self, client):
-        self.theta_info_df["stepDecimal"] = 2
-        for temp_symbol in self.candidate_symbols:
-            print("temp_symbol:", temp_symbol)
-            temp_info_dict = client.exchange_info(symbol=temp_symbol)
-            temp_stepSize = temp_info_dict['symbols'][0]['filters'][1]['stepSize']
-            temp_decimal_precision = get_decimal_precision(temp_stepSize)
-            self.theta_info_df.loc[temp_symbol,"stepDecimal"] = temp_decimal_precision
-
-        pass
-
-
 
 if __name__ == "__main__":
     util_config = dict(
         candidate_symbols=['AUTOUSDT', 'ETHBULLUSDT', 'BNBBULLUSDT', 'BNBBEARUSDT', 
-        'SUSHIDOWNUSDT', 'TRBUSDT', 'AAVEUSDT', 'BTGUSDT', 'EOSBEARUSDT', 'BCHSVUSDT', 
-        'LTCUSDT', 'ALCXUSDT', 'BEARUSDT', 'ETHBEARUSDT', 'COMPUSDT', 'EGLDUSDT', 
-        'QNTUSDT', 'XRPBULLUSDT', 'FTTUSDT', 'RGTUSDT', 'ANYUSDT', 'SSVUSDT', 
-        'GMXUSDT', 'HIFIUSDT', 'UNFIUSDT', 'EOSBULLUSDT', 'NMRUSDT', 'NANOUSDT', 
-        'SOLUSDT', 'AUCTIONUSDT', 'MULTIUSDT', 'ATOMUSDT', 'XTZDOWNUSDT', 'ETCUSDT', 
-        'AXSUSDT', 'USTUSDT', 'WLDUSDT', 'ARUSDT', 'CYBERUSDT', 'WINGUSDT', 'INJUSDT', 
-        'RUNEUSDT', 'LINKUSDT', 'MTLUSDT',  'AVAXUSDT', 'XVSUSDT', 'FORTHUSDT', 
-        'COCOSUSDT', 'OGUSDT'],
+        'SUSHIDOWNUSDT', 'TRBUSDT'],
         quote_currency='usdt',
     )
     strategy_config = dict(
@@ -231,25 +214,22 @@ if __name__ == "__main__":
     config_dict.update(util_config)
     config_dict.update(strategy_config)
 
-    API_urls = ["https://api.binance.com",
-                "https://api-gcp.binance.com",
-                "https://api1.binance.com",
-                "https://api2.binance.com",
-                "https://api3.binance.com",
-                "https://api4.binance.com"]
-
     # API key/secret are required for user data endpoints
-    client = SpotClient(api_key=g_api_key,
-                        api_secret=g_secret_key,
-                        base_url=API_urls[3])
+    client = UMFutures(key=g_api_key, secret=g_secret_key)
 
     info_c = Info_Controller(config_dict, client)
-    # print(info_c.account_info.position_df)
-    # print(info_c.account_info.account_value)
+    print('----------------------------------------------------')
+    print(info_c.account_info.position_df)
+    print(info_c.account_info.account_value)
 
-    # symbol = "COMPUSDT"
-    # info_c.account_info.position_df.loc[symbol, "free"] = 0.1
+    print('----------------------------------------------------')
+    symbol = "COMPUSDT"
+    print(info_c.account_info.position_df.loc[symbol, 'positionAmt'])
+    print(info_c.account_info.position_df.dtypes)
+    print(info_c.account_info.position_df.loc[symbol])
 
-    # info_c.update_info_all(client)  # test update
-
-    print(info_c.strategy_info.theta_info_df)
+    print('----------------------------------------------------')
+    info_c.update_info_all(client)  # test update
+    # print(info_c.strategy_info.exchange_info_df)
+    print(info_c.strategy_info.exchange_info_df.dtypes)
+    print(info_c.strategy_info.exchange_info_df.loc[symbol])
