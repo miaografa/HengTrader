@@ -96,7 +96,7 @@ class Strategy_mean_reversion(StrategyInterface):
         '''
         # 1. 判断是否需要止损
         unrealizedProfit = info_controller.account_info.position_df.loc[symbol, "unrealizedProfit"]
-        if unrealizedProfit < -0.05:  # todo 加入设置中
+        if unrealizedProfit < -4:  # todo 加入设置中
             order = self.get_close_order(symbol, info_controller=info_controller)
             return order
 
@@ -143,9 +143,9 @@ class Strategy_mean_reversion(StrategyInterface):
             '''
             balance = info_controller.account_info.USDT_value
             if balance > 100:
-                quantity = 50. / price
+                quantity = 100. / price
             elif balance > 50:
-                quantity = 20. / price
+                quantity = 50. / price
             else:
                 quantity = 0.
             return quantity

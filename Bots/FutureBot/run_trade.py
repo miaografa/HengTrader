@@ -69,14 +69,14 @@ def before_start(config_dict, api_url=None):
 
     # 1. 初始化infoController
     for i in range(5):
-        try:
-            info_controller = Info_Controller(config_dict, client)
-            print("获取账户列表第{i}次，成功".format(i=i))
-            break
-        except:
-            print("获取账户列表第{i}次，失败".format(i=i))
-            time.sleep(10)
-            continue
+        # try:
+        info_controller = Info_Controller(config_dict, client)
+        print("获取账户列表第{i}次，成功".format(i=i))
+        break
+        # except:
+        #     print("获取账户列表第{i}次，失败".format(i=i))
+        #     time.sleep(10)
+        #     continue
 
 
     # 3. 初始化交易策略
@@ -148,11 +148,12 @@ if __name__ == "__main__":
     config_dict, info_controller, strategy = before_start(config_dict)
 
     while True:
+        print('开始执行')
         try:
-            time.sleep(1.)
+            time.sleep(20.)
             run_trade(config_dict, info_controller, strategy)
             print("执行完毕")
-            time.sleep(480.)
+            time.sleep(40.)
         except:
             config_dict, my_spot_account_s, strategy = before_start(config_dict)
             continue
