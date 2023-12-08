@@ -5,7 +5,7 @@ import sys
 sys.path.append('/home/ec2-user/HengTrader')
 
 
-from Bots.FutureBot.utils.data_utils import get_decimal_precision, seperate_symbol_info_from_dict
+from Bots.FutureBot.utils.data_utils import get_decimal_precision, seperate_symbol_info_from_dict, convert_df_type
 from binance.um_futures import UMFutures
 from Bots.FutureBot.privateconfig import g_api_key, g_secret_key
 
@@ -84,18 +84,9 @@ class Account_Info(Info_Interface):
         self.account_value = account['totalWalletBalance']  # 账户价值
 
         # 2. account position info
-        position_df = pd.DataFrame(account['positions'])
+        position_df = convert_df_type(pd.DataFrame(account['positions']))  # 格式转换
         position_df.set_index('symbol', inplace=True, drop=True)
 
-        # 格式转换
-        convert_dict = {
-            'unrealizedProfit': float,
-            'leverage': float,
-            'entryPrice': float,
-            'positionAmt': float,
-                        }
-
-        position_df = position_df.astype(convert_dict)
         # 计算是否已经持仓
         position_df["is_hold"] = np.where(np.abs(position_df['positionAmt']) > 0, True, False)
 
@@ -115,18 +106,9 @@ class Account_Info(Info_Interface):
         self.account_value = account['totalWalletBalance']  # 账户价值
 
         # 2. account position info
-        position_df = pd.DataFrame(account['positions'])
+        position_df = convert_df_type(pd.DataFrame(account['positions']))  # 格式转换
         position_df.set_index('symbol', inplace=True, drop=True)
 
-        # 格式转换
-        convert_dict = {
-            'unrealizedProfit': float,
-            'leverage': float,
-            'entryPrice': float,
-            'positionAmt': float,
-        }
-
-        position_df = position_df.astype(convert_dict)
         # 计算是否已经持仓
         position_df["is_hold"] = np.where(np.abs(position_df['positionAmt']) > 0, True, False)
 

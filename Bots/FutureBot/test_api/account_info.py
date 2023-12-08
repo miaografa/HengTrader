@@ -4,6 +4,8 @@ from binance.lib.utils import config_logging
 from binance.error import ClientError
 from binance.um_futures import UMFutures
 from Bots.FutureBot.privateconfig import g_api_key, g_secret_key
+from Bots.FutureBot.utils.data_utils import convert_df_type
+
 import pandas as pd
 
 
@@ -30,13 +32,14 @@ if __name__ == '__main__':
     print("total Margin Balance: ", account['totalMarginBalance'])
 
     positions = account['positions']  # 各种合约的持仓信息
-    positions_df = pd.DataFrame(positions)
+    positions_df = convert_df_type(pd.DataFrame(positions))
 
     print(positions_df)
 
     print(positions_df.dtypes)
 
     positions_df.set_index('symbol', inplace=True)
-    print(positions_df.loc['OMGUSDT'])
-
+    # print(positions_df.loc['OMGUSDT'])
+    print(positions_df['notional'])
+    print(positions_df['notional'].sum())
 

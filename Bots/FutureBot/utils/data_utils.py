@@ -55,6 +55,18 @@ def seperate_symbol_info_from_dict(symbol_info: dict):
 
     return output_dict
 
+def convert_df_type(df):
+    # 选择需要转换的列
+    columns_to_convert = ['initialMargin', 'maintMargin', 'unrealizedProfit',
+                          'positionInitialMargin', 'openOrderInitialMargin',
+                          'leverage', 'entryPrice', 'breakEvenPrice',
+                          'maxNotional', 'positionAmt', 'notional',
+                          'isolatedWallet', 'bidNotional', 'askNotional']
+
+    # 使用pd.to_numeric()将选定列转换为float
+    df[columns_to_convert] = df[columns_to_convert].apply(pd.to_numeric, errors='coerce')
+
+    return df
 
 if __name__ == "__main__":
     symbol = 'ETHUSDT'.upper()

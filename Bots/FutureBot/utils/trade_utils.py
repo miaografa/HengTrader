@@ -27,7 +27,6 @@ class Order_Structure(object):
         if self.valid:
             assert self.symbol != '', 'Order_Structure Error: symbol is empty'
             assert self.quantity != 0., 'Order_Structure Error: quantity is 0'
-            assert self.side in ['BUY', 'SELL'], 'Order_Structure Error: side is not in [BUY, SELL]'
             assert self.type in ['MARKET', 'LIMIT'], 'Order_Structure Error: type is not in [MARKET, LIMIT]'
             if self.type == 'LIMIT':
                 assert self.price != 0., 'Order_Structure Error: price is 0, and type is LIMIT'
@@ -87,7 +86,7 @@ def check_order(trade_client, info_controller, symbol):
 
     # todo 检查是否有未完成的订单
 
-    if info_controller.account_info.position_df.loc[symbol, 'leverage'] != 1:
+    if info_controller.account_info.position_df.loc[symbol, 'leverage'] != 5:
         change_leverage(trade_client, symbol)
 
     if info_controller.account_info.position_df.loc[symbol, 'isolated'] != True:
@@ -99,7 +98,7 @@ def change_leverage(trade_client, symbol):
     '''调整杠杆率'''
     try:
         response = trade_client.change_leverage(
-            symbol=symbol, leverage=1, recvWindow=6000
+            symbol=symbol, leverage=5, recvWindow=6000
         )
         logging.info(response)
     except ClientError as error:

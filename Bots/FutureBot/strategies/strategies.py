@@ -12,7 +12,7 @@ class StrategyInterface(object):
     def __init__(self ):
         pass
 
-    def get_order_list(self,):
+    def get_order_list(self, info_controller:Info_Controller,):
         '''输入数据，得到交易订单'''
         pass
 
@@ -142,9 +142,9 @@ class Strategy_mean_reversion(StrategyInterface):
             计算买入量
             '''
             balance = info_controller.account_info.USDT_value
-            if balance > 100:
+            if balance > 1000:
                 quantity = 100. / price
-            elif balance > 50:
+            elif balance > 500:
                 quantity = 50. / price
             else:
                 quantity = 0.
@@ -176,9 +176,12 @@ class Strategy_mean_reversion(StrategyInterface):
 
         positionAmt = info_controller.account_info.position_df.loc[symbol, "positionAmt"]
         stepDecimal = info_controller.strategy_info.exchange_info_df.loc[symbol, "quantityPrecision"]
-        order.quantity = strategy_utils.np_round_floor(positionAmt, stepDecimal)
+
         if order.quantity < 0:
-            order.quantity = -order.quantity
+            order.quantity = -1 * positionAmt
+        else:
+            order.quantity = positionAmt
+        order.quantity = strategy_utils.np_round_floor(order.quantity, stepDecimal)
 
         # 判断交易方向，总是和持仓方向相反
         if positionAmt > 0:
@@ -255,3 +258,55 @@ class Strategy_mean_reversion(StrategyInterface):
         factor_df = factor_df[self.features_calculator.all_X_cols]
         prediction = self.reverse_detector.get_machine_learning_pridictions(factor_df)
         return prediction
+
+
+
+class Hedge_Strategy(StrategyInterface):
+    '''对冲策略'''
+    def __init__(self):
+        super().__init__()
+        pass
+
+    def get_order_list(self, info_controller:Info_Controller):
+        order_list = []
+
+        # 1. 获取position
+        position_df = info_controller.account_info.position_df
+        # 2. 计算对应的notion value
+        usdt_notional_value = position_df['notional'].sum()
+        # 3. 根据notion value 计算对应的BTCUSDT买卖量
+        print(usdt_notional_value)
+        quantity = -1 * usdt_notional_value
+
+        btc_order = self.get_order(
+            symbol='BTCUSDT',
+            quantity=quantity,
+            info_controller=info_controller)
+
+        order_list.append(btc_order)
+        return order_list
+
+    def get_order(self, symbol, quantity, info_controller):
+        '''
+            开仓逻辑，由ml判断是否开仓，以及开仓的方向
+            return order
+        '''
+        order = Order_Structure()
+        order.symbol = symbol
+
+        if quantity > 0:
+            order.side = 'BUY'
+        elif quantity < 0:
+            order.side = 'SELL'
+        else:
+            return None
+        # 获取挂单价格 price
+        order.price = info_controller.get_price_now(symbol)
+        # 计算买入量 quantity
+        quantity = np.abs(quantity) / order.price
+        # 保留小数点位数
+        stepDecimal = info_controller.strategy_info.exchange_info_df.loc[symbol, "quantityPrecision"]
+        order.quantity = strategy_utils.np_round_floor(quantity, stepDecimal)
+
+        return order
+

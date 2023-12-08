@@ -23,7 +23,7 @@ def get_datetime_from_timestamp(timestamp):
     return pd.to_datetime(timestamp, utc=True, unit='ms')
 
 
-def run_trade(config_dict, info_controller, strategy, api_url=None):
+def run_trade(config_dict, info_controller, strategy, hedge_strategy, api_url=None):
     '''运行交易主程序'''
     client = UMFutures(key=g_api_key, secret=g_secret_key)
 
@@ -51,9 +51,18 @@ def run_trade(config_dict, info_controller, strategy, api_url=None):
     # 3. Trade or standby
     order_s_list = strategy.get_order_list(info_controller, target_position=config_dict["fraction"])
 
+    # 4. 对冲
+    hedge_order_s_list = hedge_strategy.get_order_list(info_controller)
+
     for order_s in order_s_list:
-        order_id = create_order(client, info_controller, order_s)
-        print(order_id)
+        if order_s:
+            order_id = create_order(client, info_controller, order_s)
+            print(order_id)
+
+    for order_s in hedge_order_s_list:
+        if order_s:
+            order_id = create_order(client, info_controller, order_s)
+            print(order_id)
 
     return
 
@@ -69,25 +78,28 @@ def before_start(config_dict, api_url=None):
 
     # 1. 初始化infoController
     for i in range(5):
-        # try:
-        info_controller = Info_Controller(config_dict, client)
-        print("获取账户列表第{i}次，成功".format(i=i))
-        break
-        # except:
-        #     print("获取账户列表第{i}次，失败".format(i=i))
-        #     time.sleep(10)
-        #     continue
+        try:
+            info_controller = Info_Controller(config_dict, client)
+            print("获取账户列表第{i}次，成功".format(i=i))
+            break
+        except:
+            print("获取账户列表第{i}次，失败".format(i=i))
+            time.sleep(10)
+            continue
 
 
     # 3. 初始化交易策略
     strategy = Strategy_mean_reversion()  # mean reversion 策略
 
-    return config_dict, info_controller, strategy
+    # 4. 对冲仓位控制
+    hedge_strategy = Hedge_Strategy()  # 对冲策略
+
+    return config_dict, info_controller, strategy, hedge_strategy
 
 
 if __name__ == "__main__":
     util_config = dict(
-        candidate_symbols= ['BTCUSDT', 'ETHUSDT', 'BCHUSDT', 'XRPUSDT', 'EOSUSDT', 'LTCUSDT',
+        candidate_symbols= ['ETHUSDT', 'BCHUSDT', 'XRPUSDT', 'EOSUSDT', 'LTCUSDT',
        'TRXUSDT', 'ETCUSDT', 'LINKUSDT', 'XLMUSDT', 'ADAUSDT', 'XMRUSDT',
        'DASHUSDT', 'ZECUSDT', 'XTZUSDT', 'BNBUSDT', 'ATOMUSDT', 'ONTUSDT',
        'IOTAUSDT', 'BATUSDT', 'VETUSDT', 'NEOUSDT', 'QTUMUSDT',
@@ -145,17 +157,17 @@ if __name__ == "__main__":
     config_dict.update(util_config)
     config_dict.update(strategy_config)
 
-    config_dict, info_controller, strategy = before_start(config_dict)
+    config_dict, info_controller, strategy, hedge_strategy = before_start(config_dict)
 
     while True:
         print('开始执行')
         try:
-            time.sleep(20.)
-            run_trade(config_dict, info_controller, strategy)
+            time.sleep(2.)
+            run_trade(config_dict, info_controller, strategy, hedge_strategy)
             print("执行完毕")
-            time.sleep(40.)
+            time.sleep(480.)
         except:
-            config_dict, my_spot_account_s, strategy = before_start(config_dict)
+            config_dict, my_spot_account_s, strategy, hedge_strategy = before_start(config_dict)
             continue
 
 
