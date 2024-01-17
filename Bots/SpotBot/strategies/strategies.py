@@ -149,12 +149,8 @@ class Strategy_mean_reversion(StrategyInterface):
 
             balance = info_controller.account_info.USDT_value
 
-            if balance > 100:
-                order.amount = 50.
-
-            elif balance > 50:
-                order.amount = 20.
-
+            if balance > 50:
+                order.amount = 25.
             else:
                 # Too little cash to buy anything
                 order.amount = 0.
@@ -219,7 +215,7 @@ class Strategy_mean_reversion(StrategyInterface):
         logging.info("ml_pred:{}".format(ml_pred))
         logging.info('---------------------------------------------------------')
 
-        if theta < -1.2 and ml_pred > 0.617:
+        if theta < -1.4 and ml_pred > 0.617:
             return True
         else:
             return False
@@ -243,7 +239,7 @@ class Strategy_mean_reversion(StrategyInterface):
             return True
         
         # If the price hitting profit threshold, sell the position for profit
-        elif theta > 1.2 and ml_pred < 0.368:  
+        elif theta > 1.4 and ml_pred < 0.368:
             return True
         
         else:
