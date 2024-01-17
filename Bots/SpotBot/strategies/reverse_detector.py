@@ -1,41 +1,50 @@
-"""
-File: reverse_detector.py
-Author: Henry Miao
-Date Created: 2023-10-03
-Last Modified: --
-Description: Use machine learning to detect reversion of price.
-"""
 import pandas as pd
 import pickle
 import ta
+import os
+import sys
+import xgboost as xgb
 
+sys.path.append('c:\\Users\\Admin\\Desktop')
 
 class Reverse_Detector(object):
+
     def __init__(self, model_save_path):
+
         self.model_save_path = model_save_path
         self.xgb_model = self.load_xgb_models(model_save_path)
+    
+    def read_model(self, model_path):
 
-    def read_model(self, model_save_path, model_name):
-        with open(model_save_path + model_name, 'rb') as f:
+        with open(model_path, 'rb') as f:
             model = pickle.load(f)
+
         return model
+    
+    def load_xgb_models(self, model_save_path = 'C:\\Users\\Admin\\Desktop\\Crypto_Bot\\models\\'):
 
-    def load_xgb_models(self, model_save_path = './models/'):
-        xgb_model = self.read_model(model_save_path, 'best_xgboost_rich_model_60_full_data.pkl')
+        model_name = 'best_xgboost_rich_model_60_full_data.pkl'
+        model_path = os.path.join(model_save_path, model_name)
+
+        xgb_model = self.read_model(model_path)
+
         return xgb_model
-
-
-    def get_machine_learning_pridictions(self, factor_df):
+    
+    def get_machine_learning_predictions(self, factor_df):
         '''
-        :param factor_df: 传入的数据，包含了所有的因子
-        :param direction: 传入的方向，up 或者 down
+        :param factor_df: transferred data, including all alphas
+        :param direction: transferred direction, up/down
         '''
         data_df = factor_df.copy()
         y_predict = self.xgb_model.predict_proba(data_df.iloc[-1:, :])
-        return y_predict[0][1]
 
+        return y_predict[0][1]
+    
 class Features_Calculator(object):
+
     def __init__(self):
+
+        # Feature X(s) based on ta
         self.X_cols = [
             'rtn_1', 'OCHL_range', 'trend_adx', 'trend_cci', 'macd', 'momentum_rsi',
             'theta_close', 'theta_volume', 'theta_quote_volume', 'theta_rtn_1',
@@ -46,12 +55,15 @@ class Features_Calculator(object):
         ]
 
         self.co_diff_target_cols = ['momentum_rsi', 'theta_volume_obv', 'macd', 'trend_cci', 'trend_adx']
+
+        # Create 5 new cols for both btc and eth-based diff targets ('momentum_rsi', 'theta_volume_obv', 'macd', 'trend_cci', 'trend_adx')
         self.co_diff_target_cols_btc = ['co_diff_' + x + "_btc" for x in self.co_diff_target_cols]
         self.co_diff_target_cols_eth = ['co_diff_' + x + "_eth" for x in self.co_diff_target_cols]
 
         self.btc_X_cols = [x + "_btc" for x in self.X_cols]
         self.eth_X_cols = [x + "_eth" for x in self.X_cols]
 
+        # Total X columns for ML model
         self.all_X_cols = self.X_cols + self.btc_X_cols + self.eth_X_cols + self.co_diff_target_cols_btc + self.co_diff_target_cols_eth
         return
 
@@ -62,11 +74,12 @@ class Features_Calculator(object):
 
         if coin_name == 'btc':
             self.btc_factor_data = factor_df
+
         elif coin_name == 'eth':
             self.eth_factor_data = factor_df
+
         return
-
-
+    
     def add_ta_features(self, factor_df, raw_df):
         data_df = raw_df[['open', 'close', 'high','low', 'volume']]
 
@@ -79,60 +92,62 @@ class Features_Calculator(object):
                                                                            data_df['close'],data_df['volume'])
 
         return factor_df
-
-
+    
     def _calculate_theta(self, target_column, price_df, theta_interval):
-        '''计算单个theta'''
+        '''Calculate each theta'''
+
         theta_df = pd.DataFrame()
-        # theta
+
+        # Calculate theta based on EMA
+        # target_column = closing price
         theta_df['mean_20_' + target_column] = price_df[[target_column]].ewm(span=theta_interval, adjust=False).mean()
         theta_df['std_20_' + target_column] = price_df[[target_column]].ewm(span=theta_interval, adjust=False).std()
         theta_df[target_column] = price_df[target_column]
 
-        target_column_theta = (theta_df[target_column] - theta_df['mean_20_' + target_column]) / theta_df[
-            'std_20_' + target_column]
-        return target_column_theta
+        target_column_theta = (theta_df[target_column] - theta_df['mean_20_' + target_column]) / theta_df['std_20_' + target_column]
 
+        return target_column_theta
 
     def calculate_theta_all(self, factor_df, price_df, theta_interval_list=[], target_column_list=["close"]):
         '''
-        计算theta指标
-        factor_df: 用于存放指标的df
-        price_df：原始价格的df
+        Calculating theta value
+        factor_df: dataframe that stored theta 
+        price_df：dataframe that stored price data
         '''
         for i in range(len(target_column_list)):
+
             if len(theta_interval_list) != 0:
                 theta_interval = theta_interval_list[i]
             else:
                 theta_interval = 20
             target_column = target_column_list[i]
 
-            # 计算偏离度 theta = (p - ma) / sigma
+            # calculate theta = (p - ma) / sigma
             factor_df['theta_' + target_column] = self._calculate_theta(target_column, price_df, theta_interval)
 
         return factor_df
 
-
     def add_rtn_feature(self, factor_df, raw_df):
         '''
-        计算前一天的return作为一列
+        calculate 15 mins relative return based on prior row - "close" column
         '''
         factor_df['rtn_1'] = (raw_df['close'] - raw_df['close'].shift(1)) / raw_df['close'].shift(1)
-        return factor_df
 
+        return factor_df
 
     def add_OCHL_feature(self, factor_df, raw_df):
         '''
-        计算OCHL_range 作为波动幅度
+        calculate OCHL_range to determine volatility range
         '''
         factor_df['OCHL_range'] = (raw_df['close'] - raw_df['open']) / (raw_df['high'] - raw_df['low'])
         factor_df['OCHL_range'].fillna(1e-4, inplace=True)
-        return factor_df
 
+        return factor_df
 
     def add_all_diff_features(self, factor_df: pd.DataFrame, target_columns):
         '''
-        给需要的列做一个diff作为差值特征
+        Create a diff col for each features to de-noise
+
             diff_theta_volume
             diff_theta_volume_obv
             diff_rtn_1
@@ -144,10 +159,9 @@ class Features_Calculator(object):
             diff_macd
         '''
         for feature_name in target_columns:
-            factor_df['diff_' + feature_name] = factor_df[feature_name] - factor_df[feature_name].shift(1)  # todo改回1
+            factor_df['diff_' + feature_name] = factor_df[feature_name] - factor_df[feature_name].shift(1)
 
         return factor_df
-
 
     def get_all_features(self, data_df):
         '''
@@ -165,11 +179,11 @@ class Features_Calculator(object):
         factor_df = pd.DataFrame()
 
         # 1 原始指标
-        ### OCHL_range 和 rtn
+        ### OCHL_range 和 rtn (data_df = raw_df)
         factor_df = self.add_rtn_feature(factor_df, data_df)
         factor_df = self.add_OCHL_feature(factor_df, data_df)
 
-        ### ta 的技术指标
+        ### ta 的技术指标 (data_df = raw_df)
         factor_df = self.add_ta_features(factor_df, data_df)
 
         ### 1.1 Theta指标
@@ -190,6 +204,7 @@ class Features_Calculator(object):
                                'trend_cci',
                                'momentum_rsi',
                                'macd']
+        
         factor_df = self.add_all_diff_features(factor_df, diff_target_columns)
 
         assert data_df.shape[0] == factor_df.shape[0]
@@ -199,11 +214,9 @@ class Features_Calculator(object):
 
         return factor_df
 
-
     def combine_features(self, factor_df, btc_data, eth_data):
         concat_df = pd.concat([factor_df, btc_data, eth_data], axis=1)
         return concat_df
-
 
     def add_co_diff_features_market_coin(self, factor_df):
         '''
@@ -213,7 +226,6 @@ class Features_Calculator(object):
             factor_df['co_diff_' + feature_name + "_btc"] = factor_df[feature_name] - factor_df[feature_name + "_btc"]
             factor_df['co_diff_' + feature_name + "_eth"] = factor_df[feature_name] - factor_df[feature_name + "_eth"]
         return factor_df
-
 
     def get_all_features_add_market_coin(self, data_df):
         '''
@@ -227,9 +239,10 @@ class Features_Calculator(object):
         factor_df = self.add_co_diff_features_market_coin(factor_df)  # 加入互相关因子
         return factor_df[self.all_X_cols]
 
+## Example
 if __name__ == '__main__':
 
-    from Bots.SpotBot.utils.data_utils import get_market_prices
+    from Crypto_Bot.utils.data_utils import get_market_prices
 
     btc_price_df = get_market_prices('BTCUSDT', '15m')
     eth_price_df = get_market_prices('ETHUSDT', '15m')
@@ -249,7 +262,9 @@ if __name__ == '__main__':
 
 
     # 测试预测部分
-    model_save_path = '../models/'
+    # Older pandas version (1.5.0)
+    # Older xgboost version (1.2.0)
+    model_save_path = 'C:/Users/Admin/Desktop/Crypto_Bot/models/'
     r_d = Reverse_Detector(model_save_path)
-    y_predict = r_d.get_machine_learning_pridictions(factor_df)
+    y_predict = r_d.get_machine_learning_predictions(factor_df)
     print(y_predict)
